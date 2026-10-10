@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "CarePath Services",
+    "slug": "carepath-services",
+    "scheme": "carepath",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "android": { "package": "com.example.carepathservices" }
+  }
+}
