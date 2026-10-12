@@ -4,6 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 
+import adminRoutes from './routes/adminRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 const app = express();
 const port = Number(process.env.PORT || 4000);
 
@@ -36,7 +38,8 @@ app.get('/api/health/db', async (req, res) => {
   }
 });
 
-
+app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'funeral-services-api', timestamp: new Date().toISOString() });
 });

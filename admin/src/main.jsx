@@ -6,6 +6,8 @@ import {
   LifeBuoy, Search, Settings, ShieldCheck, Users, Wallet, X, RefreshCw
 } from 'lucide-react';
 import './styles.css';
+import { getToken, login, clearToken, apiRequest } from './api.js';
+// import { apiRequest } from 'api.js';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 
@@ -38,12 +40,74 @@ function PageHeading({ eyebrow, title, description, actions }) {
 }
 
 function OverviewPage({ apiState, refreshApi, onNavigate }) {
+  const [overview, setOverview] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        setOverviewLoading(true);
+
+        const response = await fetch(
+          `${API_BASE}/api/admin/overview`,
+          {
+            headers: { Accept: 'application/json' },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Request failed: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error('Unable to load overview data');
+        }
+
+        setOverview(result.data);
+      } catch (error) {
+        console.error('Overview API error:', error);
+      } finally {
+        setOverviewLoading(false);
+      }
+    };
+
+    fetchOverview();
+  }, []);
+
+
   const stats = [
-    { label: 'New leads', value: '—', note: 'Awaiting initial review', icon: ClipboardList },
-    { label: 'In follow-up', value: '—', note: 'Open and assigned enquiries', icon: Clock3 },
-    { label: 'Services completed', value: '—', note: 'Verified service records', icon: HeartHandshake },
-    { label: 'Commissions pending', value: '—', note: 'Awaiting owner approval', icon: Wallet },
+    {
+      label: 'Total leads',
+      value: overview?.totalLeads ?? '—',
+      note: 'All recorded enquiries',
+      icon: ClipboardList,
+    },
+    {
+      label: 'Total members',
+      value: overview?.totalMembers ?? '—',
+      note: 'Registered members',
+      icon: Users,
+    },
+    {
+      label: 'Service types',
+      value: overview?.totalServices ?? '—',
+      note: 'Configured service categories',
+      icon: HeartHandshake,
+    },
+    {
+      label: 'Overview status',
+      value: overviewLoading
+        ? 'Loading…'
+        : overview
+          ? 'Live'
+          : 'Unavailable',
+      note: 'Data fetched from the API',
+      icon: Activity,
+    },
   ];
+
 
   const sampleLeads = [
     {
@@ -94,55 +158,75 @@ function OverviewPage({ apiState, refreshApi, onNavigate }) {
   </>;
 }
 
-function LeadsPage() {
+function LeadsPage({ onOpenLead }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
 
-  const sampleLeads = [
-    {
-      id: 'LD-1001',
-      customer: 'Rahul Sharma',
-      service: 'Road Ambulance',
-      submittedBy: 'Associate Member',
-      agent: 'Not assigned',
-      status: 'new',
-      updated: 'Today',
-    },
-    {
-      id: 'LD-1002',
-      customer: 'Priya Verma',
-      service: 'Air Ambulance',
-      submittedBy: 'Team Member',
-      agent: 'Amit',
-      status: 'followup',
-      updated: 'Yesterday',
-    },
-    {
-      id: 'LD-1003',
-      customer: 'Mohit Jain',
-      service: 'Body Transportation',
-      submittedBy: 'Associate Member',
-      agent: 'Neha',
-      status: 'completed',
-      updated: 'Yesterday',
-    },
-  ];
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const filteredLeads = sampleLeads.filter((lead) => {
-    const searchText = query.toLowerCase();
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const result = await apiRequest('/api/admin/leads');
 
-    const matchesSearch = [
-      lead.id,
-      lead.customer,
-      lead.service,
-      lead.submittedBy,
-      lead.agent,
-    ].some((value) => value.toLowerCase().includes(searchText));
+        if (!result.success) {
+          throw new Error('Unable to load leads');
+        }
 
-    const matchesStatus = status === 'all' || lead.status === status;
+        setLeads(result.data);
+      } catch (err) {
+        console.error('Leads API error:', err);
+        setError('Unable to load leads. Please check the backend.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeads();
+  }, []);
+
+  const normalizeStatus = (value = '') =>
+    value.toLowerCase().replace(/[\s-]+/g, '_');
+
+  const filteredLeads = leads.filter((lead) => {
+    const searchText = query.trim().toLowerCase();
+
+    const searchableValues = [
+      lead.lead_code,
+      lead.customer_name,
+      lead.customer_phone,
+      lead.customer_email,
+      lead.hospital_or_location,
+    ];
+
+    const matchesSearch = searchableValues.some((value) =>
+      String(value ?? '').toLowerCase().includes(searchText)
+    );
+
+    const statusAliases = {
+      review: 'under_review',
+      followup: 'follow_up',
+      confirmed: 'service_confirmed',
+    };
+
+    const requestedStatus = statusAliases[status] || status;
+    const actualStatus = normalizeStatus(lead.status);
+
+    const matchesStatus =
+      status === 'all' ||
+      actualStatus === requestedStatus ||
+      (status === 'confirmed' && actualStatus === 'confirmed');
 
     return matchesSearch && matchesStatus;
   });
+
+  
+
+  
 
   return <>
     <PageHeading eyebrow="OPERATIONS" title="Leads" description="Review enquiries, follow-ups, ownership, and service progress." actions={<button className="button button-secondary" onClick={() => { setQuery(''); setStatus('all'); }}><RefreshCw size={15}/> Reset filters</button>} />
@@ -153,6 +237,9 @@ function LeadsPage() {
       </div>
 
       <div className="table-wrap">
+        {loading && <p>Loading leads...</p>}
+
+        {error && <p role="alert">{error}</p>}
         <table>
           <thead>
             <tr>
@@ -168,22 +255,51 @@ function LeadsPage() {
           <tbody>
             {filteredLeads.map((lead) => (
               <tr key={lead.id}>
+
+
                 <td>
-                  <strong>{lead.id}</strong>
-                  <div>{lead.customer}</div>
+                  <div className="lead-identity">
+                    <button
+                      type="button"
+                      className="lead-code-link"
+                      onClick={() => onOpenLead(lead.id)}
+                      title={`Open lead ${lead.lead_code}`}
+                    >
+                      {lead.lead_code}
+                    </button>
+
+                    <span className="lead-customer-name">
+                      {lead.customer_name || 'Unnamed customer'}
+                    </span>
+                  </div>
                 </td>
-                <td>{lead.service}</td>
-                <td>{lead.submittedBy}</td>
-                <td>{lead.agent}</td>
+
+
+                <td>{lead.service_name || 'Unknown service'}</td>
                 <td>
-                  <span className={`lead-status ${lead.status}`}>
-                    {lead.status === 'followup'
-                      ? 'Follow-up'
-                      : lead.status.charAt(0).toUpperCase() +
-                      lead.status.slice(1)}
+                  {lead.submitted_by_name || 'Unknown member'}
+                  {lead.submitted_by_role && (
+                    <div>{lead.submitted_by_role.replace(/_/g, ' ')}</div>
+                  )}
+                </td>
+                <td>{lead.assigned_agent_name || 'Not assigned'}</td>
+                <td>
+
+                  <span
+                    className={`lead-status status-${normalizeStatus(lead.status)}`}
+                  >
+                    <span className="status-indicator" />
+                    {String(lead.status || 'new')
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, char => char.toUpperCase())}
                   </span>
+
                 </td>
-                <td>{lead.updated}</td>
+                <td>
+                  {lead.updated_at
+                    ? new Date(lead.updated_at).toLocaleDateString()
+                    : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -202,7 +318,13 @@ function LeadsPage() {
           }}
         />
       )}
-      <span>Showing {filteredLeads.length} leads</span>
+      <div className="table-footer">
+        <span>
+          Showing <strong>{filteredLeads.length}</strong> of{' '}
+          <strong>{leads.length}</strong> leads
+        </span>
+        <span>Updated from the database</span>
+      </div>
     </section>
   </>;
 }
@@ -249,10 +371,342 @@ function CommissionsPage() {
       <div className="table-footer"><span>Showing 0 commission records</span><span>Approval and payout actions will be enabled after authorization and API integration.</span></div>
     </section>
   </>;
+}  
+
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await onLogin(email, password);
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="login-page">
+      <form className="login-card" onSubmit={handleSubmit}>
+        <h1>Admin Login</h1>
+        <p>Sign in to access the dashboard.</p>
+
+        <label htmlFor="login-email">Email address</label>
+        <input
+          id="login-email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="Enter your email"
+          autoComplete="username"
+          required
+        />
+
+        <label htmlFor="login-password">Password</label>
+        <input
+          id="login-password"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="Enter your password"
+          autoComplete="current-password"
+          required
+        />
+
+        {error && <p className="login-error">{error}</p>}
+
+        <button type="submit" disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign in'}
+        </button>
+      </form>
+    </div>
+  );
 }
+
+function LeadDetailsPage({ leadId, onBack }) {
+  const [lead, setLead] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
+  const [status, setStatus] = React.useState('');
+  const [notes, setNotes] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState('');
+
+  async function loadLead() {
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await apiRequest(`/api/admin/leads/${leadId}`);
+
+      const leadData = {
+        ...result.data.lead,
+        history: result.data.statusHistory || [],
+      };
+
+      setLead(leadData);
+      setStatus(leadData.status || 'new');
+    } catch (err) {
+      setError(err.message || 'Failed to load lead details.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => {
+    if (leadId) loadLead();
+  }, [leadId]);
+
+  async function handleStatusUpdate(event) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    setError('');
+
+    try {
+      await apiRequest(`/api/admin/leads/${leadId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, notes }),
+      });
+
+      setMessage('Lead status updated successfully.');
+      setNotes('');
+      await loadLead();
+    } catch (err) {
+      setError(err.message || 'Unable to update lead status.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <p>Loading lead details...</p>;
+  }
+
+  if (error && !lead) {
+    return (
+      <section className="panel">
+        <button className="button button-secondary" onClick={onBack}>
+          ← Back to Leads
+        </button>
+        <p role="alert">{error}</p>
+      </section>
+    );
+  }
+
+  if (!lead) return <p>Lead not found.</p>;
+
+  const formatLabel = (value = '') =>
+    value.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  return (
+    <div className="lead-details-page">
+      <button className="button button-secondary" onClick={onBack}>
+        ← Back to Leads
+      </button>
+
+      <div className="lead-details-heading">
+        <div>
+          <div className="eyebrow">LEAD MANAGEMENT</div>
+          <h1>{lead.lead_code}</h1>
+          <p>Customer enquiry and service progress</p>
+        </div>
+
+        <span className={`lead-status ${lead.status}`}>
+          {formatLabel(lead.status)}
+        </span>
+      </div>
+
+      {error && <div className="lead-alert error" role="alert">{error}</div>}
+      {message && <div className="lead-alert success">{message}</div>}
+
+      <div className="lead-details-grid">
+        <section className="panel lead-info-card">
+          <div className="panel-head">
+            <div>
+              <h2>Customer Information</h2>
+              <p>Contact details for this enquiry</p>
+            </div>
+          </div>
+
+          <div className="lead-info-row">
+            <span>Customer name</span>
+            <strong>{lead.customer_name || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Phone number</span>
+            <strong>{lead.customer_phone || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Email address</span>
+            <strong>{lead.customer_email || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Submitted by</span>
+            <strong>{lead.submitted_by_name || '—'}</strong>
+          </div>
+        </section>
+
+        <section className="panel lead-info-card">
+          <div className="panel-head">
+            <div>
+              <h2>Service Information</h2>
+              <p>Requested service and journey details</p>
+            </div>
+          </div>
+
+          <div className="lead-info-row">
+            <span>Service type</span>
+            <strong>{lead.service_name || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Hospital / location</span>
+            <strong>{lead.hospital_or_location || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Pickup location</span>
+            <strong>{lead.pickup_location || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Destination</span>
+            <strong>{lead.destination || '—'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Assigned agent</span>
+            <strong>{lead.assigned_agent_name || 'Not assigned'}</strong>
+          </div>
+          <div className="lead-info-row">
+            <span>Customer notes</span>
+            <strong>{lead.notes || '—'}</strong>
+          </div>
+        </section>
+      </div>
+
+      <section className="panel lead-update-card">
+        <div className="panel-head">
+          <div>
+            <h2>Update Lead Status</h2>
+            <p>Choose the new status and record an update note</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleStatusUpdate} className="lead-status-form">
+          <label>
+            New status
+            <select
+              value={status}
+              onChange={event => setStatus(event.target.value)}
+              required
+            >
+              <option value="new">New</option>
+              <option value="under_review">Under Review</option>
+              <option value="contacted">Contacted</option>
+              <option value="follow_up">Follow-up</option>
+              <option value="service_confirmed">Service Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+
+          <label>
+            Update notes
+            <textarea
+              value={notes}
+              onChange={event => setNotes(event.target.value)}
+              placeholder="Enter call details, follow-up information, or reason for status change..."
+              rows={3}
+            />
+          </label>
+
+          <button
+            className="button button-primary"
+            type="submit"
+            disabled={saving || status === lead.status}
+          >
+            {saving ? 'Saving...' : 'Save Status Update'}
+          </button>
+        </form>
+
+        <p className="lead-form-hint">
+          Every successful status change should be recorded in the lead history.
+          Your backend determines whether your account is authorized to update it.
+        </p>
+      </section>
+
+      <section className="panel lead-history-card">
+        <div className="panel-head">
+          <div>
+            <h2>Status History</h2>
+            <p>Recorded changes for this lead</p>
+          </div>
+          <span className="soft-tag">{lead.history.length} updates</span>
+        </div>
+
+        {lead.history.length > 0 ? (
+          <div className="lead-timeline">
+            {lead.history.map(item => (
+              <div className="lead-timeline-item" key={item.id}>
+                <span className="timeline-dot" />
+                <div>
+                  <strong>
+                    {item.old_status
+                      ? `${formatLabel(item.old_status)} → ${formatLabel(item.new_status)}`
+                      : `Lead created → ${formatLabel(item.new_status)}`}
+                  </strong>
+                  <p>{item.notes || 'No notes recorded'}</p>
+                  <small>
+                    {item.changed_at
+                      ? new Date(item.changed_at).toLocaleString()
+                      : 'Time unavailable'}
+                  </small>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="lead-history-empty">No status history recorded yet.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+
 
 function App() {
   const [activePage, setActivePage] = useState('overview');
+  const [selectedLeadId, setSelectedLeadId] = React.useState(null);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(
+    Boolean(getToken())
+  );
+
+  const [currentUser, setCurrentUser] = React.useState(null);
+
+  async function handleLogin(email, password) {
+    const user = await login(email, password);
+
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+  }
+
+  function handleLogout() {
+    clearToken();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setActivePage('overview');
+  }
+  function handleOpenLead(leadId) {
+    setSelectedLeadId(leadId);
+    setActivePage('lead-details');
+  }
   const pages = {
     overview: {
       title: 'Overview',
@@ -278,6 +732,11 @@ function App() {
       title: 'Commissions & payouts',
       heading: 'Commissions & payouts',
       description: 'Review eligible commissions and record payments.'
+    },
+    'lead-details': {
+      title: 'Lead Details',
+      heading: 'Lead Details',
+      description: 'View customer information and track lead progress.'
     }
   };
 
@@ -307,15 +766,26 @@ function App() {
   const navigate = id => setActivePage(id);
 
   let page;
-  if (activePage === 'leads') page = <LeadsPage />;
+  if (activePage === 'leads') page = <LeadsPage onOpenLead={handleOpenLead} />;
   else if (activePage === 'members') page = <MembersPage />;
   else if (activePage === 'services') page = <ServicesPage />;
   else if (activePage === 'commissions') page = <CommissionsPage />;
   else page = <OverviewPage apiState={apiState} refreshApi={refreshApi} onNavigate={navigate} />;
-
+  if (activePage === 'lead-details') {
+    page = (
+      <LeadDetailsPage
+        leadId={selectedLeadId}
+        onBack={() => setActivePage('leads')}
+      />
+    );
+  }
+ 
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
   return <div className="layout">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark">C</div><div><strong>CarePath</strong><span>Service operations</span></div></div>
+      <div className="brand"><div className="brand-mark">H</div><div><strong>Heaven Gate</strong><span>Service operations</span></div></div>
       <div className="nav-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
         {navigation.map(({ id, label, icon: Icon }) => <button type="button" key={id} className={`nav ${activePage === id ? 'active' : ''}`} onClick={() => navigate(id)}><Icon size={18}/><span>{label}</span>{activePage === id && <span className="nav-dot"/>}</button>)}
@@ -332,7 +802,7 @@ function App() {
           : activePage === 'help' ? <><PageHeading eyebrow="DOCUMENTATION" title="Help & notes" description="Project rules for the admin team."/><section className="panel help-list"><div><strong>Lead ownership</strong><p>The original submitter is retained for commission eligibility.</p></div><div><strong>Member roles</strong><p>Team Member registration requires an owner-issued code. Associates register independently and cannot add members.</p></div><div><strong>Commission rule</strong><p>Fixed amount per eligible completed service, with owner approval and manual payout records.</p></div><div><strong>Development status</strong><p>This milestone is an interactive UI shell. Live data, authentication, and write operations are not yet connected.</p></div></section></>
           : page}
       </div>
-      <footer>CarePath Services · Internal operations interface · Development build{checkedAt ? ` · Last API check ${checkedAt.toLocaleTimeString()}` : ''}</footer>
+      <footer>Heaven Gate · Internal operations interface · Development build{checkedAt ? ` · Last API check ${checkedAt.toLocaleTimeString()}` : ''}</footer>
     </main>
   </div>;
 }

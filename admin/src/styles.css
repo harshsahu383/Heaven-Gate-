@@ -130,3 +130,339 @@
     font-size: 11px;
     color: #64748b;
 }
+
+/* leads page styles */
+
+/* Lead details page */
+.lead-details-page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    width: 100%;
+}
+
+.lead-details-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.lead-details-heading h1 {
+    margin: 6px 0;
+    font-size: 28px;
+}
+
+.lead-details-heading p {
+    margin: 0;
+    color: var(--text-muted, #718096);
+}
+
+.lead-details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.lead-info-card,
+.lead-update-card,
+.lead-history-card {
+    min-width: 0;
+    padding: 22px;
+}
+
+.lead-info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border, #e8edf2);
+    overflow-wrap: anywhere;
+}
+
+.lead-info-row:last-child {
+    border-bottom: 0;
+}
+
+.lead-info-row span {
+    color: var(--text-muted, #718096);
+    font-size: 13px;
+}
+
+.lead-info-row strong {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.lead-status-form {
+    display: flex;
+    flex-direction: column;
+    gap: 17px;
+}
+
+.lead-status-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.lead-status-form select,
+.lead-status-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 13px;
+    border: 1px solid var(--border, #dce3eb);
+    border-radius: 9px;
+    background: var(--surface, #fff);
+    color: inherit;
+    font: inherit;
+}
+
+.lead-status-form textarea {
+    resize: vertical;
+}
+
+.lead-form-hint {
+    margin-bottom: 0;
+    color: var(--text-muted, #718096);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.lead-alert {
+    padding: 13px 16px;
+    border-radius: 9px;
+    font-size: 14px;
+}
+
+.lead-alert.error {
+    background: #fff0f0;
+    color: #a12626;
+}
+
+.lead-alert.success {
+    background: #e9f8f1;
+    color: #176b48;
+}
+
+.lead-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.lead-timeline-item {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding: 0 0 24px;
+}
+
+.lead-timeline-item:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 13px;
+    bottom: 0;
+    width: 2px;
+    background: var(--border, #e8edf2);
+}
+
+.timeline-dot {
+    position: relative;
+    z-index: 1;
+    flex: 0 0 12px;
+    width: 12px;
+    height: 12px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #2d8c83;
+}
+
+.lead-timeline-item strong {
+    font-size: 14px;
+}
+
+.lead-timeline-item p {
+    margin: 7px 0;
+    color: var(--text-muted, #718096);
+    font-size: 13px;
+}
+
+.lead-timeline-item small {
+    color: var(--text-muted, #718096);
+    font-size: 12px;
+}
+
+.lead-history-empty {
+    padding: 18px 0;
+    color: var(--text-muted, #718096);
+}
+
+@media (max-width: 760px) {
+    .lead-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lead-info-card,
+    .lead-update-card,
+    .lead-history-card {
+        padding: 16px;
+    }
+
+    .lead-details-heading h1 {
+        font-size: 23px;
+    }
+}
+
+
+/* Lead identity in the leads table */
+.lead-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+}
+
+.lead-code-link {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #286b91;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.5;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.lead-code-link:hover {
+    color: #174e70;
+    text-decoration: underline;
+}
+
+.lead-code-link:focus-visible {
+    outline: 2px solid #328b83;
+    outline-offset: 3px;
+    border-radius: 3px;
+}
+
+.lead-customer-name {
+    display: block;
+    max-width: 220px;
+    color: #273548;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* Consistent status badges */
+.lead-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px 10px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 1.4;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+.status-indicator {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* New */
+.status-new {
+    color: #216b9b;
+    background: #eaf4fc;
+    border-color: #d3e8f8;
+}
+
+/* Under review */
+.status-under_review {
+    color: #8b6416;
+    background: #fff6dc;
+    border-color: #f5e6b3;
+}
+
+/* Contacted */
+.status-contacted {
+    color: #5b55a0;
+    background: #f0efff;
+    border-color: #dedcff;
+}
+
+/* Follow-up */
+.status-follow_up {
+    color: #9a5a17;
+    background: #fff0e1;
+    border-color: #f8dfc5;
+}
+
+/* Service confirmed */
+.status-service_confirmed {
+    color: #16705f;
+    background: #e5f7f1;
+    border-color: #c7ebdf;
+}
+
+/* Completed */
+.status-completed {
+    color: #217344;
+    background: #e8f7ed;
+    border-color: #ccebd6;
+}
+
+/* Cancelled */
+.status-cancelled {
+    color: #a3323c;
+    background: #fff0f1;
+    border-color: #f5d3d7;
+}
+
+/* Keep the table result count tidy */
+.table-footer,
+.table-wrap+.table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 13px 0 0;
+    border-top: 1px solid #e9edf2;
+    color: #68778a;
+    font-size: 12px;
+}
+
+@media (max-width: 600px) {
+    .lead-customer-name {
+        max-width: 160px;
+    }
+
+    .lead-status {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+}
