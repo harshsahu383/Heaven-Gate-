@@ -39,27 +39,75 @@ function PageHeading({ eyebrow, title, description, actions }) {
   </div>;
 }
 
+
+function MyProfilePage({ currentUser }) {
+  const fullName = currentUser?.fullName || 'Admin';
+  const email = currentUser?.email || 'Not available';
+  const role = String(currentUser?.role || 'admin')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const initials = fullName
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <>
+      <PageHeading
+        eyebrow="ACCOUNT"
+        title="My Profile"
+        description="View your CarePath account information."
+      />
+
+      <section className="panel my-profile-panel">
+        <div className="my-profile-header">
+          <div className="my-profile-avatar">{initials}</div>
+          <div>
+            <h2>{fullName}</h2>
+            <p>{email}</p>
+            <span className="soft-tag">{role}</span>
+          </div>
+        </div>
+
+        <div className="my-profile-details">
+          <div>
+            <span>Full name</span>
+            <strong>{fullName}</strong>
+          </div>
+
+          <div>
+            <span>Email address</span>
+            <strong>{email}</strong>
+          </div>
+
+          <div>
+            <span>Account role</span>
+            <strong>{role}</strong>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+
 function OverviewPage({ apiState, refreshApi, onNavigate }) {
   const [overview, setOverview] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
 
   useEffect(() => {
+
     const fetchOverview = async () => {
       try {
         setOverviewLoading(true);
 
-        const response = await fetch(
-          `${API_BASE}/api/admin/overview`,
-          {
-            headers: { Accept: 'application/json' },
-          }
-        );
+        const result = await apiRequest('/api/admin/overview');
 
-        if (!response.ok) {
-          throw new Error(`Request failed: ${response.status}`);
-        }
-
-        const result = await response.json();
+        console.log('Overview API response:', result);
 
         if (!result.success) {
           throw new Error('Unable to load overview data');
@@ -72,6 +120,7 @@ function OverviewPage({ apiState, refreshApi, onNavigate }) {
         setOverviewLoading(false);
       }
     };
+
 
     fetchOverview();
   }, []);
@@ -135,25 +184,25 @@ function OverviewPage({ apiState, refreshApi, onNavigate }) {
 
   return <>
     <PageHeading eyebrow="OPERATIONS OVERVIEW" title="Good day." description="Review enquiries, coordinate services, and keep every lead moving with care."
-      actions={<button className="button button-primary" onClick={() => onNavigate('leads')}><ClipboardList size={16}/> View leads <ArrowUpRight size={16}/></button>} />
+      actions={<button className="button button-primary" onClick={() => onNavigate('leads')}><ClipboardList size={16} /> View leads <ArrowUpRight size={16} /></button>} />
     <div className="stat-grid">{stats.map(({ label, value, note, icon: Icon }) => <article className="stat-card" key={label}>
-      <div className="stat-top"><span>{label}</span><span className="stat-icon"><Icon size={18}/></span></div>
+      <div className="stat-top"><span>{label}</span><span className="stat-icon"><Icon size={18} /></span></div>
       <strong className="stat-value">{value}</strong><span className="stat-note">{note}</span>
     </article>)}</div>
     <div className="content-grid">
       <article className="panel">
-        <div className="panel-head"><div><h2>Lead activity</h2><p>Recent enquiries and follow-ups</p></div><button className="button button-quiet" onClick={() => onNavigate('leads')}>View all <ArrowUpRight size={14}/></button></div>
+        <div className="panel-head"><div><h2>Lead activity</h2><p>Recent enquiries and follow-ups</p></div><button className="button button-quiet" onClick={() => onNavigate('leads')}>View all <ArrowUpRight size={14} /></button></div>
         <EmptyState icon={Activity} title="No live lead data yet" description="Lead activity will appear here after the leads API and database are connected." action="Open lead management" onAction={() => onNavigate('leads')} />
       </article>
       <article className="panel">
-        <div className="panel-head"><div><h2>Commission approvals</h2><p>Owner review queue</p></div><Wallet size={19} color="#2D8C83"/></div>
-        <div className="approval-box"><div className="approval-symbol"><ShieldCheck size={19}/></div><strong>Approval queue not connected</strong><p>Verified completed services will create eligible fixed-commission records for owner review.</p><button className="button button-secondary" onClick={() => onNavigate('commissions')}>Review commission area</button></div>
+        <div className="panel-head"><div><h2>Commission approvals</h2><p>Owner review queue</p></div><Wallet size={19} color="#2D8C83" /></div>
+        <div className="approval-box"><div className="approval-symbol"><ShieldCheck size={19} /></div><strong>Approval queue not connected</strong><p>Verified completed services will create eligible fixed-commission records for owner review.</p><button className="button button-secondary" onClick={() => onNavigate('commissions')}>Review commission area</button></div>
         <div className="note-line">Payments are recorded manually by an authorized owner.</div>
       </article>
     </div>
     <article className="panel api-panel">
-      <div className="panel-head"><div><h2>Backend connection</h2><p>Development API health check</p></div><button className="button button-secondary" onClick={refreshApi}><RefreshCw size={14}/> Check again</button></div>
-      <div className={`connection-row ${apiState.status}`}><span className="connection-dot"/><div><strong>{apiState.label}</strong><p>{apiState.detail}</p></div></div>
+      <div className="panel-head"><div><h2>Backend connection</h2><p>Development API health check</p></div><button className="button button-secondary" onClick={refreshApi}><RefreshCw size={14} /> Check again</button></div>
+      <div className={`connection-row ${apiState.status}`}><span className="connection-dot" /><div><strong>{apiState.label}</strong><p>{apiState.detail}</p></div></div>
     </article>
   </>;
 }
@@ -224,16 +273,16 @@ function LeadsPage({ onOpenLead }) {
     return matchesSearch && matchesStatus;
   });
 
-  
 
-  
+
+
 
   return <>
-    <PageHeading eyebrow="OPERATIONS" title="Leads" description="Review enquiries, follow-ups, ownership, and service progress." actions={<button className="button button-secondary" onClick={() => { setQuery(''); setStatus('all'); }}><RefreshCw size={15}/> Reset filters</button>} />
+    <PageHeading eyebrow="OPERATIONS" title="Leads" description="Review enquiries, follow-ups, ownership, and service progress." actions={<button className="button button-secondary" onClick={() => { setQuery(''); setStatus('all'); }}><RefreshCw size={15} /> Reset filters</button>} />
     <section className="panel">
       <div className="toolbar">
-        <label className="search-field"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search lead ID, contact, or hospital" aria-label="Search leads"/></label>
-        <label className="select-field"><Filter size={15}/><select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by lead status"><option value="all">All statuses</option><option value="new">New lead</option><option value="review">Under review</option><option value="contacted">Contacted</option><option value="followup">Follow-up</option><option value="confirmed">Service confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><ChevronDown size={14}/></label>
+        <label className="search-field"><Search size={16} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search lead ID, contact, or hospital" aria-label="Search leads" /></label>
+        <label className="select-field"><Filter size={15} /><select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter by lead status"><option value="all">All statuses</option><option value="new">New lead</option><option value="review">Under review</option><option value="contacted">Contacted</option><option value="followup">Follow-up</option><option value="confirmed">Service confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><ChevronDown size={14} /></label>
       </div>
 
       <div className="table-wrap">
@@ -329,27 +378,620 @@ function LeadsPage({ onOpenLead }) {
   </>;
 }
 
-function MembersPage() {
+
+
+
+function MembersPage({ onOpenMember }) {
+
   const [role, setRole] = useState('all');
   const [query, setQuery] = useState('');
-  return <>
-    <PageHeading eyebrow="PEOPLE" title="Members" description="Manage Team Members, independent Associates, and registration access." actions={<span className="soft-tag"><ShieldCheck size={14}/> Team Member signup requires a code</span>} />
-    <section className="panel">
-      <div className="toolbar">
-        <label className="search-field"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, member ID, or email" aria-label="Search members"/></label>
-        <label className="select-field"><Users size={15}/><select value={role} onChange={e => setRole(e.target.value)} aria-label="Filter member role"><option value="all">All roles</option><option value="team_member">Team Member</option><option value="associate">Associate Member</option><option value="calling_agent">Calling Agent</option><option value="admin">Admin</option></select><ChevronDown size={14}/></label>
+  const [members, setMembers] = useState({
+    teamMembers: [],
+    independentAssociates: [],
+    otherMembers: [],
+  });
+  const [expanded, setExpanded] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchMembers() {
+      try {
+        setLoading(true);
+        setError('');
+
+
+        const result = await apiRequest('/api/admin/members');
+
+        if (!result.success) {
+          throw new Error('Unable to load members.');
+        }
+
+        const data = result.data;
+
+        if (Array.isArray(data)) {
+          // Handle the old API response format safely.
+          setMembers({
+            teamMembers: data
+              .filter((member) => member.role === 'team_member')
+              .map((member) => ({ ...member, associates: [] })),
+            independentAssociates: data.filter(
+              (member) =>
+                member.role === 'associate' &&
+                member.parent_member_id == null
+            ),
+            otherMembers: data.filter(
+              (member) =>
+                member.role === 'admin' ||
+                member.role === 'calling_agent'
+            ),
+          });
+        } else {
+          setMembers({
+            teamMembers: Array.isArray(data?.teamMembers)
+              ? data.teamMembers
+              : [],
+            independentAssociates: Array.isArray(data?.independentAssociates)
+              ? data.independentAssociates
+              : [],
+            otherMembers: Array.isArray(data?.otherMembers)
+              ? data.otherMembers
+              : [],
+          });
+        }
+
+      } catch (err) {
+        setError(err.message || 'Unable to load members.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMembers();
+  }, []);
+
+  const normalizeRole = (value = '') =>
+    value.toLowerCase().replace(/_/g, ' ');
+
+  const matchesSearch = (member) => {
+    const search = query.trim().toLowerCase();
+
+    return [
+      member.full_name,
+      member.email,
+      member.phone,
+      String(member.id),
+    ].some((value) =>
+      String(value ?? '').toLowerCase().includes(search)
+    );
+  };
+
+  const matchesRole = (member) =>
+    role === 'all' || member.role === role;
+
+  const filteredTeams = members.teamMembers
+    .map((team) => ({
+      ...team,
+      associates: (team.associates || []).filter(
+        (associate) =>
+          matchesRole(associate) &&
+          matchesSearch(associate)
+      ),
+    }))
+    .filter((team) => {
+      const teamMatches =
+        matchesRole(team) && matchesSearch(team);
+
+      const associateMatches = team.associates.length > 0;
+
+      return teamMatches || associateMatches;
+    });
+
+  const filteredIndependent = members.independentAssociates
+    .filter(matchesSearch)
+    .filter(matchesRole);
+
+  const filteredOthers = members.otherMembers
+    .filter(matchesSearch)
+    .filter(matchesRole);
+
+  const visibleCount =
+    filteredTeams.reduce(
+      (count, team) =>
+        count + 1 + team.associates.length,
+      0
+    ) +
+    filteredIndependent.length +
+    filteredOthers.length;
+
+  function renderMember(member) {
+    return (
+      <div className="member-row" key={member.id}>
+        <div className="member-avatar">
+          {member.full_name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+
+        <div className="member-main">
+
+          <button
+            type="button"
+            className="lead-code-link"
+            onClick={() => onOpenMember(member.id)}
+            title={`View ${member.full_name} details`}
+          >
+            {member.full_name}
+          </button>
+
+          <span>{member.email || 'No email'}</span>
+          <span>{member.phone || 'No phone'}</span>
+        </div>
+
+        <span className="member-role">
+          {normalizeRole(member.role)}
+        </span>
+
+        <span
+          className={`member-status status-${member.account_status}`}
+        >
+          {member.account_status}
+        </span>
+
+        <span className="member-date">
+          {member.created_at
+            ? new Date(member.created_at).toLocaleDateString()
+            : '—'}
+        </span>
       </div>
-      <div className="table-wrap"><table><thead><tr><th>Member</th><th>Role</th><th>Account status</th><th>Joined</th><th>Lead count</th></tr></thead></table></div>
-      <EmptyState icon={Users} title="Member directory is not connected" description="Member records will load from the protected members API. Associates remain independent unless an explicit permitted relationship is created." />
-      <div className="table-footer"><span>Showing 0 members</span><span>Role and status filters are UI-ready; data integration is pending.</span></div>
-    </section>
-  </>;
+    );
+  }
+
+  return (
+    <>
+      <PageHeading
+        eyebrow="PEOPLE"
+        title="Members"
+        description="View Team Members, their Associates, and independent members."
+        actions={
+          <span className="soft-tag">
+            <ShieldCheck size={14} />
+            Authorized member directory
+          </span>
+        }
+      />
+
+      <section className="panel">
+        <div className="toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name, ID, email, or phone"
+              aria-label="Search members"
+            />
+          </label>
+
+          <label className="select-field">
+            <Users size={15} />
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              aria-label="Filter member role"
+            >
+              <option value="all">All roles</option>
+              <option value="team_member">Team Member</option>
+              <option value="associate">Associate Member</option>
+              <option value="calling_agent">Calling Agent</option>
+              <option value="admin">Admin</option>
+            </select>
+            <ChevronDown size={14} />
+          </label>
+        </div>
+
+        {loading && <p>Loading members...</p>}
+        {error && <p role="alert">{error}</p>}
+
+        {!loading && !error && (
+          <>
+            <div className="member-directory">
+              {filteredTeams.map((team) => {
+                const isExpanded = Boolean(expanded[team.id]);
+
+                return (
+                  <section className="member-group" key={team.id}>
+                    <button
+                      type="button"
+                      className="member-team-toggle"
+                      aria-expanded={isExpanded}
+                      onClick={() =>
+                        setExpanded((previous) => ({
+                          ...previous,
+                          [team.id]: !previous[team.id],
+                        }))
+                      }
+                    >
+                      <div className="member-avatar team-avatar">
+                        {team.full_name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+
+                      <div className="member-main">
+                        <strong
+                          role="link"
+                          tabIndex={0}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenMember(team.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onOpenMember(team.id);
+                            }
+                          }}
+                        >
+                          {team.full_name}
+                        </strong>
+                        <span>{team.email || 'No email'}</span>
+                        <span>
+                          {team.associates.length} matching associate
+                          {team.associates.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+
+                      <span className="member-role">Team Member</span>
+
+                      <span
+                        className={`member-status status-${team.account_status}`}
+                      >
+                        {team.account_status}
+                      </span>
+
+                      <ChevronDown
+                        className={`member-chevron ${isExpanded ? 'expanded' : ''}`}
+                        size={18}
+                      />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="member-associates">
+                        {team.associates.length > 0 ? (
+                          team.associates.map((associate) => (
+                            <div
+                              className="member-associate"
+                              key={associate.id}
+                            >
+                              {renderMember(associate)}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="member-empty">
+                            No associates match your search or filter.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+
+              {filteredIndependent.length > 0 && (
+                <section className="member-section">
+                  <h3>Independent Associates</h3>
+                  {filteredIndependent.map(renderMember)}
+                </section>
+              )}
+
+              {filteredOthers.length > 0 && (
+                <section className="member-section">
+                  <h3>Other Accounts</h3>
+                  {filteredOthers.map(renderMember)}
+                </section>
+              )}
+
+              {visibleCount === 0 && (
+                <EmptyState
+                  icon={Users}
+                  title="No members found"
+                  description="Try another search term or role filter."
+                  action="Clear filters"
+                  onAction={() => {
+                    setQuery('');
+                    setRole('all');
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="table-footer">
+              <span>
+                Showing <strong>{visibleCount}</strong> matching member
+                {visibleCount === 1 ? '' : 's'}
+              </span>
+              <span>Loaded from the database</span>
+            </div>
+          </>
+        )}
+      </section>
+    </>
+  );
 }
+
+
+function MemberDetailsPage({
+  memberId,
+  onBack,
+  onOpenMember,
+  onOpenLead,
+}) {
+  const [details, setDetails] = useState(null);
+  const [associates, setAssociates] = useState([]);
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchMemberDetails() {
+      try {
+        setLoading(true);
+        setError('');
+
+        const memberResult = await apiRequest(
+          `/api/admin/members/${memberId}`
+        );
+
+        if (!memberResult.success) {
+          throw new Error('Unable to load member details.');
+        }
+
+        setDetails(memberResult.data);
+
+        if (memberResult.data.member.role === 'team_member') {
+          const associateResult = await apiRequest(
+            `/api/admin/members/${memberId}/associates`
+          );
+
+          if (!associateResult.success) {
+            throw new Error('Unable to load Associates.');
+          }
+
+          setAssociates(associateResult.data || []);
+        } else {
+          setAssociates([]);
+        }
+
+        const leadsResult = await apiRequest(
+          `/api/admin/members/${memberId}/leads`
+        );
+
+        if (!leadsResult.success) {
+          throw new Error('Unable to load submitted leads.');
+        }
+
+        setLeads(leadsResult.data || []);
+      } catch (err) {
+        console.error('Member details API error:', err);
+        setError(err.message || 'Unable to load member details.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (memberId) {
+      fetchMemberDetails();
+    }
+  }, [memberId]);
+
+  const formatLabel = (value = '') =>
+    value.replace(/[_-]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+
+  const formatDate = (value) =>
+    value ? new Date(value).toLocaleDateString() : '—';
+
+  if (loading) {
+    return <section className="panel"><p>Loading member details...</p></section>;
+  }
+
+  if (error) {
+    return (
+      <section className="panel">
+        <button className="button button-secondary" onClick={onBack}>
+          ← Back to Members
+        </button>
+        <p role="alert">{error}</p>
+      </section>
+    );
+  }
+
+  if (!details?.member) {
+    return <p>Member not found.</p>;
+  }
+
+  const { member, associateCount, leadSummary } = details;
+
+  const summaryCards = [
+    { label: 'Total leads', value: leadSummary?.total ?? 0 },
+    { label: 'Completed', value: leadSummary?.completed ?? 0 },
+    { label: 'Cancelled', value: leadSummary?.cancelled ?? 0 },
+    { label: 'In progress', value: leadSummary?.inProgress ?? 0 },
+  ];
+
+  return (
+    <div className="lead-details-page">
+      <button className="button button-secondary" onClick={onBack}>
+        ← Back to Members
+      </button>
+
+      <PageHeading
+        eyebrow="MEMBER MANAGEMENT"
+        title={member.full_name}
+        description={`${formatLabel(member.role)} · Member ID ${member.id}`}
+      />
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>Profile information</h2>
+            <p>Member contact and account details</p>
+          </div>
+        </div>
+
+        <div className="lead-info-row">
+          <span>Full name</span>
+          <strong>{member.full_name || '—'}</strong>
+        </div>
+        <div className="lead-info-row">
+          <span>Email</span>
+          <strong>{member.email || '—'}</strong>
+        </div>
+        <div className="lead-info-row">
+          <span>Phone</span>
+          <strong>{member.phone || '—'}</strong>
+        </div>
+        <div className="lead-info-row">
+          <span>Role</span>
+          <strong>{formatLabel(member.role)}</strong>
+        </div>
+        <div className="lead-info-row">
+          <span>Account status</span>
+          <strong>{formatLabel(member.account_status)}</strong>
+        </div>
+        <div className="lead-info-row">
+          <span>Joined</span>
+          <strong>{formatDate(member.created_at)}</strong>
+        </div>
+
+        {member.role === 'associate' && (
+          <div className="lead-info-row">
+            <span>Team Member</span>
+            <strong>
+              {member.parent_member_name || 'Independent Associate'}
+            </strong>
+          </div>
+        )}
+      </section>
+
+      <section className="stat-grid">
+        {summaryCards.map((item) => (
+          <article className="stat-card" key={item.label}>
+            <div className="stat-top">
+              <span>{item.label}</span>
+            </div>
+            <strong className="stat-value">{item.value}</strong>
+          </article>
+        ))}
+      </section>
+
+      {member.role === 'team_member' && (
+        <section className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Associated Associates</h2>
+              <p>{associateCount ?? associates.length} linked Associates</p>
+            </div>
+          </div>
+
+          {associates.length > 0 ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Total leads</th>
+                    <th>Completed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {associates.map((associate) => (
+                    <tr key={associate.id}>
+
+                      <td>
+                        <button
+                          type="button"
+                          className="lead-code-link"
+                          onClick={() => onOpenMember(associate.id)}
+                          title={`View ${associate.full_name} details`}
+                        >
+                          {associate.full_name}
+                        </button>
+                      </td>
+
+                      <td>{associate.email || '—'}</td>
+                      <td>{formatLabel(associate.account_status)}</td>
+                      <td>{associate.total_leads ?? 0}</td>
+                      <td>{associate.completed_leads ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="member-empty">No Associates linked to this Team Member.</p>
+          )}
+        </section>
+      )}
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>Submitted leads</h2>
+            <p>Leads submitted directly by this member</p>
+          </div>
+        </div>
+
+        {leads.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Lead ID</th>
+                  <th>Customer</th>
+                  <th>Service</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((lead) => (
+                  <tr key={lead.id}>
+
+                    <td>
+                      <button
+                        type="button"
+                        className="lead-code-link"
+                        onClick={() => onOpenLead(lead.id)}
+                        title={`View lead ${lead.lead_code || lead.id}`}
+                      >
+                        {lead.lead_code || lead.id}
+                      </button>
+                    </td>
+
+                    <td>{lead.customer_name || 'Unnamed customer'}</td>
+                    <td>{lead.service_name || 'Unknown service'}</td>
+                    <td>{formatDate(lead.created_at)}</td>
+                    <td>{formatLabel(lead.status)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="member-empty">This member has not submitted any leads yet.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+
+
 
 function ServicesPage() {
   return <>
     <PageHeading eyebrow="CONFIGURATION" title="Service types" description="Maintain the service categories and fixed commission amount used by the business." />
-    <div className="callout"><ShieldCheck size={19}/><div><strong>Financial rule</strong><p>Commission amounts should be changed only by an authorized owner. Existing earned commission records must preserve their original amount.</p></div></div>
+    <div className="callout"><ShieldCheck size={19} /><div><strong>Financial rule</strong><p>Commission amounts should be changed only by an authorized owner. Existing earned commission records must preserve their original amount.</p></div></div>
     <section className="panel">
       <div className="table-wrap"><table><thead><tr><th>Service type</th><th>Description</th><th>Commission rule</th><th>Status</th></tr></thead></table></div>
       <EmptyState icon={HeartHandshake} title="No service types configured" description="Local transportation, international transportation, and other client-approved services will be managed here after the service types API is implemented." />
@@ -360,22 +1002,25 @@ function ServicesPage() {
 function CommissionsPage() {
   const [status, setStatus] = useState('all');
   return <>
-    <PageHeading eyebrow="FINANCE" title="Commissions & payouts" description="Review eligible commissions, approve amounts, and record payments manually." actions={<span className="soft-tag"><Wallet size={14}/> Manual owner approval</span>} />
-    <div className="callout"><ShieldCheck size={19}/><div><strong>No recruitment-based commission</strong><p>Only the eligible member who submitted the lead can earn the configured fixed commission. Team relationships do not create a commission entitlement.</p></div></div>
+    <PageHeading eyebrow="FINANCE" title="Commissions & payouts" description="Review eligible commissions, approve amounts, and record payments manually." actions={<span className="soft-tag"><Wallet size={14} /> Manual owner approval</span>} />
+    <div className="callout"><ShieldCheck size={19} /><div><strong>No recruitment-based commission</strong><p>Only the eligible member who submitted the lead can earn the configured fixed commission. Team relationships do not create a commission entitlement.</p></div></div>
     <section className="panel">
       <div className="toolbar">
-        <label className="select-field"><Filter size={15}/><select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter commission status"><option value="all">All commission statuses</option><option value="pending">Pending approval</option><option value="approved">Approved</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select><ChevronDown size={14}/></label>
+        <label className="select-field"><Filter size={15} /><select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter commission status"><option value="all">All commission statuses</option><option value="pending">Pending approval</option><option value="approved">Approved</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select><ChevronDown size={14} /></label>
       </div>
       <div className="table-wrap"><table><thead><tr><th>Commission ID</th><th>Lead / service</th><th>Eligible member</th><th>Amount</th><th>Status</th><th>Payment reference</th></tr></thead></table></div>
       <EmptyState icon={Wallet} title="No commission records yet" description={status === 'all' ? 'Eligible commission records will be generated after a service is verified as completed.' : 'No records match this status. Live commission records will be available after API integration.'} />
       <div className="table-footer"><span>Showing 0 commission records</span><span>Approval and payout actions will be enabled after authorization and API integration.</span></div>
     </section>
   </>;
-}  
+}
+
 
 function LoginPage({ onLogin }) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [loginRole, setLoginRole] = React.useState('admin');
+  const [showPassword, setShowPassword] = React.useState(false);
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
@@ -385,51 +1030,142 @@ function LoginPage({ onLogin }) {
     setLoading(true);
 
     try {
-      await onLogin(email, password);
+      await onLogin(email, password, loginRole);
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      setError(err.message || 'Unable to sign in. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Admin Login</h1>
-        <p>Sign in to access the dashboard.</p>
+    <main className="login-page">
+      <section className="login-layout">
+        <div className="login-brand-panel">
+          <div className="login-brand">
+            <div className="login-brand-icon">✚</div>
+            <span>Heaven Gate</span>
+          </div>
 
-        <label htmlFor="login-email">Email address</label>
-        <input
-          id="login-email"
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="Enter your email"
-          autoComplete="username"
-          required
-        />
+          <div className="login-brand-content">
+            <span className="login-eyebrow">YOUR WORKSPACE, SIMPLIFIED</span>
+            <h1>Care that connects.<br />Support that matters.</h1>
+            <p>
+              Manage service requests, coordinate leads, and help
+              families connect with the support they need.
+            </p>
 
-        <label htmlFor="login-password">Password</label>
-        <input
-          id="login-password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="Enter your password"
-          autoComplete="current-password"
-          required
-        />
+            <div className="login-feature">
+              <span>✓</span>
+              <div>
+                <strong>Secure access</strong>
+                <small>Role-based access to your workspace</small>
+              </div>
+            </div>
 
-        {error && <p className="login-error">{error}</p>}
+            <div className="login-feature">
+              <span>✓</span>
+              <div>
+                <strong>One connected platform</strong>
+                <small>Keep your service operations organized</small>
+              </div>
+            </div>
+          </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
-        </button>
-      </form>
-    </div>
+          <p className="login-brand-footer">
+            Heaven Gate · Professional service management
+          </p>
+        </div>
+
+        <div className="login-form-panel">
+          <form className="login-card" onSubmit={handleSubmit}>
+            <span className="login-welcome">WELCOME BACK</span>
+            <h2>Sign in to Heaven Gate</h2>
+            <p className="login-subtitle">
+              Choose your account type to continue.
+            </p>
+
+            <div className="login-role-options">
+              <button
+                type="button"
+                className={`login-role-option ${loginRole === 'admin' ? 'active' : ''
+                  }`}
+                aria-pressed={loginRole === 'admin'}
+                onClick={() => setLoginRole('admin')}
+              >
+                <span className="login-role-icon">♙</span>
+                <span>Admin</span>
+                <small>Manage platform</small>
+              </button>
+
+              <button
+                type="button"
+                className={`login-role-option ${loginRole === 'calling_agent' ? 'active' : ''
+                  }`}
+                aria-pressed={loginRole === 'calling_agent'}
+                onClick={() => setLoginRole('calling_agent')}
+              >
+                <span className="login-role-icon">☏</span>
+                <span>Calling Agent</span>
+                <small>Manage assigned leads</small>
+              </button>
+            </div>
+
+            <label htmlFor="login-email">Work email</label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@company.com"
+              autoComplete="username"
+              required
+            />
+
+            <label htmlFor="login-password">Password</label>
+            <div className="login-password-wrap">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {error && (
+              <p className="login-error" role="alert">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              className="login-submit"
+              disabled={loading}
+            >
+              {loading ? 'Signing in...' : 'Sign in securely'}
+              {!loading && <span>→</span>}
+            </button>
+
+            <p className="login-security">
+              <span>✓</span> Protected access to your workspace
+            </p>
+          </form>
+        </div>
+      </section>
+    </main>
   );
 }
+
 
 function LeadDetailsPage({ leadId, onBack }) {
   const [lead, setLead] = React.useState(null);
@@ -682,13 +1418,151 @@ function LeadDetailsPage({ leadId, onBack }) {
 
 
 function App() {
-  const [activePage, setActivePage] = useState('overview');
+  const [activePage, setActivePage] = useState(() => {
+    return sessionStorage.getItem('carepath_active_page') || 'overview';
+  });
   const [selectedLeadId, setSelectedLeadId] = React.useState(null);
+
+  const [selectedMemberId, setSelectedMemberId] = React.useState(() => {
+    const savedId = sessionStorage.getItem('carepath_selected_member_id');
+    return savedId ? Number(savedId) : null;
+  });
+
   const [isAuthenticated, setIsAuthenticated] = React.useState(
     Boolean(getToken())
   );
 
   const [currentUser, setCurrentUser] = React.useState(null);
+
+  const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
+
+
+
+  React.useEffect(() => {
+    sessionStorage.setItem('carepath_active_page', activePage);
+  }, [activePage]);
+
+
+  React.useEffect(() => {
+    const handlePopState = (event) => {
+      const pageFromHistory = event.state?.page;
+
+      if (pageFromHistory) {
+        setActivePage(pageFromHistory);
+
+        if (event.state.memberId) {
+          setSelectedMemberId(event.state.memberId);
+          sessionStorage.setItem(
+            'carepath_selected_member_id',
+            String(event.state.memberId)
+          );
+        }
+
+        if (event.state.leadId) {
+          setSelectedLeadId(event.state.leadId);
+        }
+
+        return;
+      }
+
+      // Fallback for history entries without Heaven Gate state.
+      const hash = window.location.hash.slice(1);
+
+      if (hash.startsWith('member-details/')) {
+        const memberId = Number(hash.split('/')[1]);
+        setSelectedMemberId(memberId);
+        setActivePage('member-details');
+      } else if (hash.startsWith('lead-details/')) {
+        const leadId = Number(hash.split('/')[1]);
+        setSelectedLeadId(leadId);
+        setActivePage('lead-details');
+      } else if (
+        ['overview', 'members', 'leads', 'services', 'commissions'].includes(hash)
+      ) {
+        setActivePage(hash);
+      } else {
+        setActivePage('overview');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+
+
+  React.useEffect(() => {
+    const token = getToken();
+
+    if (!token) {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      return;
+    }
+
+    apiRequest('/api/auth/me')
+      .then((result) => {
+        if (result.success) {
+          setCurrentUser(result.user);
+          setIsAuthenticated(true);
+        } else {
+          clearToken();
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Session restoration failed:', error);
+        clearToken();
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      });
+
+
+
+  }, []);
+
+  React.useEffect(() => {
+    const checkSession = async () => {
+      if (!getToken()) {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
+      try {
+        const result = await apiRequest('/api/auth/me');
+
+        if (result.success) {
+          setCurrentUser(result.user);
+          setIsAuthenticated(true);
+        } else {
+          clearToken();
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        }
+      } catch {
+        clearToken();
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+    };
+
+    const handlePageShow = () => {
+      checkSession();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, []);
+
+
 
   async function handleLogin(email, password) {
     const user = await login(email, password);
@@ -703,9 +1577,18 @@ function App() {
     setIsAuthenticated(false);
     setActivePage('overview');
   }
+
   function handleOpenLead(leadId) {
+    window.history.pushState({ page: 'lead-details', leadId }, '', `#lead-details/${leadId}`);
     setSelectedLeadId(leadId);
     setActivePage('lead-details');
+  }
+
+  function handleOpenMember(memberId) {
+    sessionStorage.setItem('carepath_selected_member_id', String(memberId));
+    window.history.pushState({ page: 'member-details', memberId }, '', `#member-details/${memberId}`);
+    setSelectedMemberId(memberId);
+    setActivePage('member-details');
   }
   const pages = {
     overview: {
@@ -737,14 +1620,27 @@ function App() {
       title: 'Lead Details',
       heading: 'Lead Details',
       description: 'View customer information and track lead progress.'
-    }
+    },
+
+    'member-details': {
+      title: 'Member Details',
+      heading: 'Member Details',
+      description: 'View member profiles, Associates, and submitted leads.'
+    },
+
+    'my-profile': {
+      title: 'My Profile',
+      heading: 'My Profile',
+      description: 'View your CarePath account information.'
+    },
+
   };
 
-  const currentPage = pages[activePage];
+  const currentPage = pages[activePage] || pages.overview;
   const [apiState, setApiState] = useState({ status: 'checking', label: 'Checking backend…', detail: `Trying ${API_BASE}/api/health` });
   const [checkedAt, setCheckedAt] = useState(null);
 
-  
+
 
   const refreshApi = async () => {
     setApiState({ status: 'checking', label: 'Checking backend…', detail: `Trying ${API_BASE}/api/health` });
@@ -763,14 +1659,34 @@ function App() {
   useEffect(() => { refreshApi(); }, []);
 
   const pageTitle = useMemo(() => navigation.find(item => item.id === activePage)?.label || 'Overview', [activePage]);
-  const navigate = id => setActivePage(id);
+  const navigate = (id) => {
+    if (id === activePage) return;
+
+    window.history.pushState({ page: id }, '', `#${id}`);
+    setActivePage(id);
+  };
+
 
   let page;
-  if (activePage === 'leads') page = <LeadsPage onOpenLead={handleOpenLead} />;
-  else if (activePage === 'members') page = <MembersPage />;
-  else if (activePage === 'services') page = <ServicesPage />;
-  else if (activePage === 'commissions') page = <CommissionsPage />;
-  else page = <OverviewPage apiState={apiState} refreshApi={refreshApi} onNavigate={navigate} />;
+
+  if (activePage === 'my-profile') {
+    page = <MyProfilePage currentUser={currentUser} />;
+  } else if (activePage === 'leads') {
+    page = <LeadsPage onOpenLead={handleOpenLead} />;
+  } else if (activePage === 'members') {
+    page = <MembersPage onOpenMember={handleOpenMember} />;
+  } else if (activePage === 'services') {
+    page = <ServicesPage />;
+  } else if (activePage === 'commissions') {
+    page = <CommissionsPage />;
+  } else {
+    page = <OverviewPage
+      apiState={apiState}
+      refreshApi={refreshApi}
+      onNavigate={navigate}
+    />;
+  }
+
   if (activePage === 'lead-details') {
     page = (
       <LeadDetailsPage
@@ -779,7 +1695,20 @@ function App() {
       />
     );
   }
- 
+
+
+  if (activePage === 'member-details') {
+    page = (
+      <MemberDetailsPage
+        memberId={selectedMemberId}
+        onBack={() => setActivePage('members')}
+        onOpenMember={handleOpenMember}
+        onOpenLead={handleOpenLead}
+      />
+    );
+  }
+
+
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} />;
   }
@@ -788,19 +1717,82 @@ function App() {
       <div className="brand"><div className="brand-mark">H</div><div><strong>Heaven Gate</strong><span>Service operations</span></div></div>
       <div className="nav-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
-        {navigation.map(({ id, label, icon: Icon }) => <button type="button" key={id} className={`nav ${activePage === id ? 'active' : ''}`} onClick={() => navigate(id)}><Icon size={18}/><span>{label}</span>{activePage === id && <span className="nav-dot"/>}</button>)}
+        {navigation.map(({ id, label, icon: Icon }) => <button type="button" key={id} className={`nav ${activePage === id ? 'active' : ''}`} onClick={() => navigate(id)}><Icon size={18} /><span>{label}</span>{activePage === id && <span className="nav-dot" />}</button>)}
       </nav>
       <div className="nav-label secondary-label">SUPPORT</div>
-      <button type="button" className={`nav ${activePage === 'settings' ? 'active' : ''}`} onClick={() => navigate('settings')}><Settings size={18}/><span>Settings</span></button>
-      <button type="button" className={`nav ${activePage === 'help' ? 'active' : ''}`} onClick={() => navigate('help')}><CircleHelp size={18}/><span>Help & notes</span></button>
+      <button type="button" className={`nav ${activePage === 'settings' ? 'active' : ''}`} onClick={() => navigate('settings')}><Settings size={18} /><span>Settings</span></button>
+      <button type="button" className={`nav ${activePage === 'help' ? 'active' : ''}`} onClick={() => navigate('help')}><CircleHelp size={18} /><span>Help & notes</span></button>
       <div className="sidebar-bottom"><div className="avatar">AD</div><div><strong>Admin workspace</strong><span>Local development</span></div></div>
     </aside>
     <main className="main">
-      <header className="topbar"><div><span className="crumb">Workspace /</span> <strong>{currentPage.title}</strong></div><div className="top-right"><span className={`status ${apiState.status}`}><i/> {apiState.status === 'connected' ? 'API connected' : apiState.status === 'checking' ? 'Checking API' : 'API offline'}</span><IconButton label="Check backend connection" onClick={refreshApi}><RefreshCw size={16}/></IconButton><IconButton label="Notifications" onClick={() => window.alert('Notifications will be available after backend integration.')}><Bell size={17}/></IconButton><div className="avatar">AD</div></div></header>
+      <header className="topbar"><div><span className="crumb">Workspace /</span> <strong>{currentPage.title}</strong></div><div className="top-right"><span className={`status ${apiState.status}`}><i /> {apiState.status === 'connected' ? 'API connected' : apiState.status === 'checking' ? 'Checking API' : 'API offline'}</span><IconButton label="Check backend connection" onClick={refreshApi}><RefreshCw size={16} /></IconButton><IconButton label="Notifications" onClick={() => window.alert('Notifications will be available after backend integration.')}><Bell size={17} /></IconButton><div className="avatar">AD</div>
+
+        <div className="profile-menu">
+          <button
+            type="button"
+            className="profile-trigger"
+            onClick={() => setProfileMenuOpen((open) => !open)}
+            aria-expanded={profileMenuOpen}
+            aria-label="Open account menu"
+          >
+            <span className="avatar">
+              {(currentUser?.fullName || 'Admin')
+                .split(' ')
+                .map((part) => part[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()}
+            </span>
+
+          </button>
+
+          {profileMenuOpen && (
+            <div className="profile-dropdown">
+              <div className="profile-dropdown-heading">
+                <strong>{currentUser?.fullName || 'Admin'}</strong>
+                <span>{currentUser?.email || 'Signed-in account'}</span>
+                <small>{currentUser?.role || 'admin'}</small>
+              </div>
+
+              <div className="profile-dropdown-divider" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  navigate('my-profile');
+                }}
+              >
+                <Users size={16} />
+                My profile
+              </button>
+
+              <button
+                type="button"
+                className="profile-signout"
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  if (
+                    window.confirm(
+                      'Are you sure you want to sign out of Heaven Gate?'
+                    )
+                  ) {
+                    handleLogout();
+                  }
+                }}
+              >
+                <X size={16} />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+
+      </div></header>
       <div className="page-content">
-        {activePage === 'settings' ? <><PageHeading eyebrow="WORKSPACE" title="Settings" description="Environment and application configuration."/><section className="panel settings-list"><div><strong>API base URL</strong><span>{API_BASE}</span></div><div><strong>Environment</strong><span>Development preview</span></div><div><strong>Authentication</strong><span>Not implemented yet — protected data is not available in this UI milestone.</span></div></section></>
-          : activePage === 'help' ? <><PageHeading eyebrow="DOCUMENTATION" title="Help & notes" description="Project rules for the admin team."/><section className="panel help-list"><div><strong>Lead ownership</strong><p>The original submitter is retained for commission eligibility.</p></div><div><strong>Member roles</strong><p>Team Member registration requires an owner-issued code. Associates register independently and cannot add members.</p></div><div><strong>Commission rule</strong><p>Fixed amount per eligible completed service, with owner approval and manual payout records.</p></div><div><strong>Development status</strong><p>This milestone is an interactive UI shell. Live data, authentication, and write operations are not yet connected.</p></div></section></>
-          : page}
+        {activePage === 'settings' ? <><PageHeading eyebrow="WORKSPACE" title="Settings" description="Environment and application configuration." /><section className="panel settings-list"><div><strong>API base URL</strong><span>{API_BASE}</span></div><div><strong>Environment</strong><span>Development preview</span></div><div><strong>Authentication</strong><span>Not implemented yet — protected data is not available in this UI milestone.</span></div></section></>
+          : activePage === 'help' ? <><PageHeading eyebrow="DOCUMENTATION" title="Help & notes" description="Project rules for the admin team." /><section className="panel help-list"><div><strong>Lead ownership</strong><p>The original submitter is retained for commission eligibility.</p></div><div><strong>Member roles</strong><p>Team Member registration requires an owner-issued code. Associates register independently and cannot add members.</p></div><div><strong>Commission rule</strong><p>Fixed amount per eligible completed service, with owner approval and manual payout records.</p></div><div><strong>Development status</strong><p>This milestone is an interactive UI shell. Live data, authentication, and write operations are not yet connected.</p></div></section></>
+            : page}
       </div>
       <footer>Heaven Gate · Internal operations interface · Development build{checkedAt ? ` · Last API check ${checkedAt.toLocaleTimeString()}` : ''}</footer>
     </main>

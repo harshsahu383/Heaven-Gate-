@@ -10,6 +10,113 @@
     font-weight: 600;
     white-space: nowrap;
 }
+/* My Profile page */
+.my-profile-panel {
+    overflow: hidden;
+    padding: 0;
+}
+
+.my-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 32px;
+    background: linear-gradient(135deg, #f0fdfa, #ffffff);
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.my-profile-avatar {
+    width: 88px;
+    height: 88px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 24px;
+    background: #247f76;
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 700;
+    box-shadow: 0 8px 20px rgba(36, 127, 118, 0.18);
+}
+
+.my-profile-header h2 {
+    margin: 0 0 7px;
+    color: #172b2a;
+    font-size: 24px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.my-profile-header p {
+    margin: 0 0 14px;
+    color: #64748b;
+    overflow-wrap: anywhere;
+}
+
+.my-profile-header .soft-tag {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    text-transform: capitalize;
+}
+
+.my-profile-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 28px 32px;
+}
+
+.my-profile-details>div {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.my-profile-details>div>span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.my-profile-details>div>strong {
+    color: #172b2a;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+    .my-profile-header {
+        align-items: flex-start;
+        gap: 16px;
+        padding: 22px 18px;
+    }
+
+    .my-profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        font-size: 23px;
+    }
+
+    .my-profile-header h2 {
+        font-size: 20px;
+    }
+
+    .my-profile-details {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+        padding: 18px;
+    }
+
+    .my-profile-details>div {
+        padding: 16px;
+    }
+}
 
 .lead-status.new {
     color: #0369a1;
@@ -31,6 +138,10 @@
 .table-wrap {
     width: 100%;
     overflow-x: auto;
+    width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
 }
 
 .table-wrap table {
@@ -248,10 +359,842 @@
     color: #176b48;
 }
 
+.password-toggle {
+    display: block;
+    margin-top: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #2d8c83;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.password-toggle:hover {
+    color: #226d66;
+    text-decoration: underline;
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid #2d8c83;
+    outline-offset: 3px;
+    border-radius: 3px;
+}
+
+/* Heaven Gate Login Page */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f5f7fa;
+    box-sizing: border-box;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 36px;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid #e4e9ef;
+    border-radius: 18px;
+    box-shadow: 0 16px 45px rgba(23, 50, 77, 0.10);
+}
+
+.login-card h1 {
+    margin: 0 0 10px;
+    color: #17324d;
+    font-size: 28px;
+}
+
+.login-card>p {
+    margin: 0 0 24px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.login-role-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.login-role-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 88px;
+    padding: 14px;
+    border: 1px solid #dbe3eb;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #17324d;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.login-role-option span:first-child {
+    font-size: 23px;
+}
+
+.login-role-option.active {
+    border-color: #2d8c83;
+    background: #edf8f6;
+    box-shadow: 0 0 0 2px rgba(45, 140, 131, 0.12);
+}
+
+.login-role-option:hover {
+    border-color: #2d8c83;
+}
+
+.login-card label {
+    display: block;
+    margin: 16px 0 7px;
+    color: #17324d;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.login-card input {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px solid #d5dee8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #17324d;
+    font: inherit;
+}
+
+.login-card input:focus {
+    outline: 2px solid rgba(45, 140, 131, 0.25);
+    border-color: #2d8c83;
+}
+
+.login-card button[type="submit"] {
+    width: 100%;
+    min-height: 46px;
+    margin-top: 22px;
+    border: none;
+    border-radius: 9px;
+    background: #17324d;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-card button[type="submit"]:hover {
+    background: #244968;
+}
+
+.login-card button[type="submit"]:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.login-error {
+    color: #c0392b;
+    font-size: 13px;
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: 24px;
+    }
+}
+/* ===== Heaven Gate Premium Login ===== */
+
+.login-page {
+    min-height: 100vh;
+    padding: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    background:
+        radial-gradient(ellipse at top left, #e3f1f0 0%, transparent 45%),
+        #f3f6fa;
+    font-family: inherit;
+}
+
+.login-layout {
+    width: 100%;
+    max-width: 1100px;
+    min-height: 650px;
+    display: grid;
+    grid-template-columns: 0.95fr 1.05fr;
+    overflow: hidden;
+    border: 1px solid #e1e8ef;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 28px 80px rgba(23, 50, 77, 0.13);
+}
+
+.login-brand-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 44px;
+    color: #ffffff;
+    background:
+        radial-gradient(circle at 90% 10%, rgba(65, 160, 148, 0.35), transparent 35%),
+        linear-gradient(145deg, #17324d, #10253a);
+}
+
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 25px;
+    font-weight: 750;
+    letter-spacing: -0.6px;
+}
+
+.login-brand-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    background: #2d8c83;
+    color: white;
+    font-size: 26px;
+}
+
+.login-brand-content {
+    max-width: 390px;
+    margin: 55px 0;
+}
+
+.login-eyebrow,
+.login-welcome {
+    color: #2d8c83;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.8px;
+}
+
+.login-brand-panel .login-eyebrow {
+    color: #83d8cb;
+}
+
+.login-brand-content h1 {
+    margin: 18px 0;
+    font-size: clamp(30px, 3.2vw, 43px);
+    line-height: 1.18;
+    letter-spacing: -1.5px;
+    color: #ffffff;
+}
+
+.login-brand-content>p {
+    color: #c6d5e2;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.login-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    margin-top: 28px;
+}
+
+.login-feature>span {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(81, 184, 165, 0.18);
+    color: #83d8cb;
+    font-weight: 800;
+}
+
+.login-feature strong,
+.login-feature small {
+    display: block;
+}
+
+.login-feature strong {
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #ffffff;
+}
+
+.login-feature small {
+    color: #b9cbd9;
+    line-height: 1.5;
+}
+
+.login-brand-footer {
+    margin: 0;
+    color: #a9bdce;
+    font-size: 12px;
+}
+
+.login-form-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    min-width: 0;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 390px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.login-card h2 {
+    margin: 12px 0 8px;
+    color: #17324d;
+    font-size: 29px;
+    letter-spacing: -0.8px;
+}
+
+.login-subtitle {
+    margin: 0 0 28px;
+    color: #718096;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.login-role-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.login-role-option {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 15px;
+    border: 1px solid #dce5ed;
+    border-radius: 13px;
+    background: #ffffff;
+    color: #17324d;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.login-role-option:hover {
+    border-color: #2d8c83;
+    transform: translateY(-1px);
+}
+
+.login-role-option.active {
+    border-color: #2d8c83;
+    background: #eff8f6;
+    box-shadow: 0 0 0 1px #2d8c83;
+}
+
+.login-role-icon {
+    font-size: 23px;
+    color: #2d8c83;
+}
+
+.login-role-option>span:nth-child(2) {
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.login-role-option small {
+    color: #718096;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.login-card label {
+    display: block;
+    margin: 18px 0 8px;
+    color: #344b60;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.login-card input {
+    display: block;
+    width: 100%;
+    height: 48px;
+    padding: 0 13px;
+    box-sizing: border-box;
+    border: 1px solid #dce4ec;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #17324d;
+    font: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-card input::placeholder {
+    color: #a0acb9;
+}
+
+.login-card input:focus {
+    outline: none;
+    border-color: #2d8c83;
+    box-shadow: 0 0 0 3px rgba(45, 140, 131, 0.12);
+}
+
+.login-password-wrap {
+    position: relative;
+}
+
+.login-password-wrap input {
+    padding-right: 65px;
+}
+
+.login-card .password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 5px;
+    border: 0;
+    background: transparent;
+    color: #2d8c83;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.login-error {
+    margin: 14px 0 0;
+    color: #c0392b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.login-card .login-submit {
+    width: 100%;
+    min-height: 49px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 12px 18px;
+    border: 0;
+    border-radius: 10px;
+    background: #17324d;
+    color: #ffffff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.login-card .login-submit:hover {
+    background: #234866;
+    transform: translateY(-1px);
+}
+
+.login-card .login-submit:disabled {
+    opacity: 0.65;
+    cursor: wait;
+    transform: none;
+}
+
+.login-security {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 7px;
+    margin: 20px 0 0;
+    color: #7b8998;
+    font-size: 11px;
+}
+
+.login-security span {
+    color: #2d8c83;
+    font-weight: 800;
+}
+
+@media (max-width: 800px) {
+    .login-page {
+        padding: 16px;
+    }
+
+    .login-layout {
+        max-width: 520px;
+        grid-template-columns: 1fr;
+    }
+
+    .login-brand-panel {
+        padding: 28px;
+    }
+
+    .login-brand-content {
+        margin: 35px 0 10px;
+    }
+
+    .login-brand-content h1 {
+        font-size: 32px;
+    }
+
+    .login-feature {
+        margin-top: 18px;
+    }
+
+    .login-brand-footer {
+        margin-top: 28px;
+    }
+
+    .login-form-panel {
+        padding: 32px 24px;
+    }
+}
+
+@media (max-width: 380px) {
+    .login-role-options {
+        grid-template-columns: 1fr;
+    }
+}
+/* ===== Heaven Gate Dashboard Logout ===== */
+
+.dashboard-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 10px 15px;
+    border: 1px solid #e2e8ef;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #17324d;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.dashboard-logout:hover {
+    background: #fff1f0;
+    border-color: #f0c5c1;
+    color: #b93832;
+}
+
+.dashboard-logout:focus-visible {
+    outline: 3px solid rgba(45, 140, 131, 0.3);
+    outline-offset: 3px;
+}
+
+.logout-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    line-height: 1;
+}
+
+/* ===== Profile menu ===== */
+
+.profile-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.profile-trigger {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.profile-trigger .avatar {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #dcebe8;
+    color: #226d66;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.profile-trigger:hover .avatar {
+    background: #c8e1dc;
+}
+
+.profile-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 1000;
+    width: 260px;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid #e2e8ef;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 14px 38px rgba(23, 50, 77, 0.16);
+}
+
+.profile-dropdown-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    overflow-wrap: anywhere;
+}
+
+.profile-dropdown-heading strong {
+    color: #17324d;
+    font-size: 14px;
+}
+
+.profile-dropdown-heading span,
+.profile-dropdown-heading small {
+    color: #718096;
+    font-size: 12px;
+}
+
+.profile-dropdown-divider {
+    height: 1px;
+    margin: 5px 0;
+    background: #edf0f4;
+}
+
+.profile-dropdown>button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #344b60;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.profile-dropdown>button:hover {
+    background: #f3f6fa;
+}
+
+.profile-dropdown>.profile-signout {
+    color: #b93832;
+}
+
+.profile-dropdown>.profile-signout:hover {
+    background: #fff1f0;
+}
+
 .lead-timeline {
     display: flex;
     flex-direction: column;
     gap: 0;
+}
+
+.member-status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.member-status.status-active {
+    background: #e6f5ed;
+    color: #247347;
+}
+
+.member-status.status-pending {
+    background: #fff4d9;
+    color: #956600;
+}
+
+.member-status.status-suspended {
+    background: #fdebea;
+    color: #b93832;
+}
+/* ===== Hierarchical member directory ===== */
+
+.member-directory {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.member-group,
+.member-section {
+    overflow: hidden;
+    border: 1px solid #e2e8ef;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.member-team-toggle {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 16px;
+    border: 0;
+    background: #ffffff;
+    color: #17324d;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.member-team-toggle:hover {
+    background: #f7fafc;
+}
+
+.member-avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #edf1f6;
+    color: #17324d;
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.team-avatar {
+    background: #dcebe8;
+    color: #226d66;
+}
+
+.member-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.member-main strong {
+    color: #17324d;
+    font-size: 13px;
+}
+
+.member-main>span {
+    overflow-wrap: anywhere;
+    color: #718096;
+    font-size: 12px;
+}
+
+.member-role {
+    color: #53677a;
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.member-date {
+    color: #718096;
+    font-size: 12px;
+}
+
+.member-chevron {
+    flex-shrink: 0;
+    color: #718096;
+    transition: transform 0.2s;
+}
+
+.member-chevron.expanded {
+    transform: rotate(180deg);
+}
+
+.member-associates {
+    padding: 8px 16px 12px 30px;
+    border-top: 1px solid #edf0f4;
+    background: #f8fafc;
+}
+
+.member-associate {
+    padding: 8px 0 8px 18px;
+    border-left: 2px solid #c8e1dc;
+}
+
+.member-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+}
+
+.member-section {
+    padding: 16px;
+}
+
+.member-section h3 {
+    margin: 0 0 10px;
+    color: #17324d;
+    font-size: 14px;
+}
+
+.member-section .member-row {
+    border-top: 1px solid #edf0f4;
+}
+
+.member-empty {
+    margin: 10px;
+    color: #718096;
+    font-size: 13px;
+}
+
+@media (max-width: 700px) {
+
+    .member-team-toggle,
+    .member-row {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .member-main {
+        flex-basis: calc(100% - 60px);
+    }
+
+    .member-role,
+    .member-date {
+        margin-left: 50px;
+    }
+
+    .member-associates {
+        padding-left: 12px;
+    }
 }
 
 .lead-timeline-item {
@@ -464,5 +1407,21 @@
     .lead-status {
         padding: 4px 8px;
         font-size: 10px;
+    }
+}
+/* Mobile-friendly Leads table */
+@media (max-width: 600px) {
+    .table-wrap table {
+        min-width: 720px;
+    }
+
+    .toolbar {
+        flex-wrap: wrap;
+    }
+
+    .search-field,
+    .select-field {
+        width: 100%;
+        max-width: 100%;
     }
 }

@@ -3,7 +3,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
-
+import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 
 router.post('/login', async (req, res) => {
@@ -86,5 +86,48 @@ router.post('/login', async (req, res) => {
         });
     }
 });
+
+
+router.get('/me', authenticate, async (req, res) => {
+    try {
+        const [members] = await pool.query(
+            `SELECT id, full_name, email, role, account_status
+             FROM members
+             WHERE id = ?
+             LIMIT 1`,
+            [req.user.id]
+        );
+
+        if (
+            members.length === 0 ||
+            members[0].account_status !== 'active'
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: 'Account not found or inactive.',
+            });
+        }
+
+        const member = members[0];
+
+        return res.json({
+            success: true,
+            user: {
+                id: Number(member.id),
+                fullName: member.full_name,
+                email: member.email,
+                role: member.role,
+            },
+        });
+    } catch (error) {
+        console.error('Fetch current user failed:', error.message);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Unable to fetch current user.',
+        });
+    }
+});
+
 
 export default router;
