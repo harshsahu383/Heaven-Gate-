@@ -1,6 +1,7 @@
 
 import express from 'express';
 import pool from '../config/db.js';
+import bcrypt from 'bcrypt';
 import {
     authenticate,
     requireAdmin,
@@ -2060,6 +2061,143 @@ router.patch(
             });
         } finally {
             connection?.release();
+        }
+    }
+);
+
+
+router.delete(
+    '/service-types/:id',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        const connection = await pool.getConnection();
+
+        try {
+            const serviceId = Number(req.params.id);
+            const { password } = req.body;
+
+            if (!Number.isSafeInteger(serviceId) || serviceId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid service type ID.',
+                });
+            }
+
+            if (typeof password !== 'string' || !password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Admin password is required.',
+                });
+            }
+
+            // Verify the password of the currently authenticated admin.
+            const [members] = await connection.query(
+                `SELECT id, password_hash, role, account_status
+                 FROM members
+                 WHERE id = ?
+                 LIMIT 1`,
+                [req.user.id]
+            );
+
+            if (
+                members.length === 0 ||
+                members[0].role !== 'admin' ||
+                members[0].account_status !== 'active'
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'An active admin account is required.',
+                });
+            }
+
+            const passwordMatches = await bcrypt.compare(
+                password,
+                members[0].password_hash
+            );
+
+            if (!passwordMatches) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Incorrect admin password.',
+                });
+            }
+
+            await connection.beginTransaction();
+
+            // Lock the service row while checking whether it can be deleted.
+            const [services] = await connection.query(
+                `SELECT id, name
+                 FROM service_types
+                 WHERE id = ?
+                 FOR UPDATE`,
+                [serviceId]
+            );
+
+            if (services.length === 0) {
+                await connection.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message: 'Service type not found.',
+                });
+            }
+
+            // Preserve historical lead and commission records.
+            const [leads] = await connection.query(
+                `SELECT id
+                 FROM leads
+                 WHERE service_type_id = ?
+                 LIMIT 1`,
+                [serviceId]
+            );
+
+            if (leads.length > 0) {
+                await connection.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'This service is linked to existing leads and cannot be deleted. Deactivate it instead.',
+                });
+            }
+
+            await connection.query(
+                `DELETE FROM service_types
+                 WHERE id = ?`,
+                [serviceId]
+            );
+
+            await connection.commit();
+
+            return res.json({
+                success: true,
+                message: 'Service type deleted successfully.',
+                data: {
+                    id: serviceId,
+                    name: services[0].name,
+                },
+            });
+        } catch (error) {
+            await connection.rollback().catch(() => { });
+
+            // Foreign-key constraints may protect other related records too.
+            if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'This service is linked to existing records and cannot be deleted. Deactivate it instead.',
+                });
+            }
+
+            console.error('Delete service type failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to delete service type.',
+            });
+        } finally {
+            connection.release();
         }
     }
 );

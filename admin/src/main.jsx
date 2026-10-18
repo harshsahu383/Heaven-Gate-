@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import {
   Activity, ArrowDownToLine, ArrowUpRight, Bell, CheckCircle2, ChevronDown,
   CircleHelp, ClipboardList, Clock3, Filter, HeartHandshake, LayoutDashboard,
-  LifeBuoy, Search, Settings, ShieldCheck, Users, Wallet, X, RefreshCw
+  LifeBuoy, Search, Settings, ShieldCheck, Users, Wallet, X, RefreshCw, Trash2,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from 'lucide-react';
 import './styles.css';
 import { getToken, login, clearToken, apiRequest } from './api.js';
@@ -988,32 +991,1019 @@ function MemberDetailsPage({
 
 
 
+
 function ServicesPage() {
-  return <>
-    <PageHeading eyebrow="CONFIGURATION" title="Service types" description="Maintain the service categories and fixed commission amount used by the business." />
-    <div className="callout"><ShieldCheck size={19} /><div><strong>Financial rule</strong><p>Commission amounts should be changed only by an authorized owner. Existing earned commission records must preserve their original amount.</p></div></div>
-    <section className="panel">
-      <div className="table-wrap"><table><thead><tr><th>Service type</th><th>Description</th><th>Commission rule</th><th>Status</th></tr></thead></table></div>
-      <EmptyState icon={HeartHandshake} title="No service types configured" description="Local transportation, international transportation, and other client-approved services will be managed here after the service types API is implemented." />
-    </section>
-  </>;
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const [editingId, setEditingId] = useState(null);
+  const [deleteService, setDeleteService] = useState(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    commission_percentage: '0',
+  });
+
+  async function fetchServices() {
+    try {
+      setLoading(true);
+      setError('');
+
+      const result = await apiRequest('/api/admin/service-types');
+
+      if (!result.success) {
+        throw new Error('Unable to load service types.');
+      }
+
+      setServices(Array.isArray(result.data) ? result.data : []);
+    } catch (err) {
+      setError(err.message || 'Unable to load service types.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchServices();
+  }, []);
+
+  function resetForm() {
+    setEditingId(null);
+    setForm({
+      name: '',
+      description: '',
+      commission_percentage: '0',
+    });
+  }
+  function openDeleteModal(service) {
+    setDeleteService(service);
+    setDeletePassword('');
+    setShowDeletePassword(false);
+    setDeleteError('');
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return;
+
+    setDeleteService(null);
+    setDeletePassword('');
+    setShowDeletePassword(false);
+    setDeleteError('');
+  }
+
+  async function confirmDelete() {
+    if (!deletePassword.trim()) {
+      setDeleteError('Please enter your admin password.');
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setDeleteError('');
+
+      const result = await apiRequest(
+        `/api/admin/service-types/${deleteService.id}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ password: deletePassword }),
+        }
+      );
+
+      if (result.success === false) {
+        throw new Error(result.message || 'Unable to delete service.');
+      }
+
+      setMessage(result.message || 'Service deleted successfully.');
+      setDeleteService(null);
+      setDeletePassword('');
+
+      await fetchServices();
+    } catch (err) {
+      setDeleteError(err.message || 'Unable to delete service.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+  function startEdit(service) {
+    setEditingId(service.id);
+    setForm({
+      name: service.name || '',
+      description: service.description || '',
+      commission_percentage: String(
+        service.commission_percentage ?? 0
+      ),
+    });
+    setMessage('');
+    setError('');
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        commission_percentage: Number(form.commission_percentage),
+      };
+
+      if (
+        !payload.name ||
+        !Number.isFinite(payload.commission_percentage) ||
+        payload.commission_percentage < 0 ||
+        payload.commission_percentage > 100
+      ) {
+        throw new Error(
+          'Enter a name and a commission percentage between 0 and 100.'
+        );
+      }
+
+      const result = await apiRequest(
+        editingId
+          ? `/api/admin/service-types/${editingId}`
+          : '/api/admin/service-types',
+        {
+          method: editingId ? 'PUT' : 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      if (result.success === false) {
+        throw new Error(result.message || 'Unable to save service type.');
+      }
+
+      setMessage(
+        editingId
+          ? 'Service type updated successfully.'
+          : 'Service type created successfully.'
+      );
+
+      resetForm();
+      await fetchServices();
+    } catch (err) {
+      setError(err.message || 'Unable to save service type.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+  async function toggleStatus(service) {
+    setError('');
+    setMessage('');
+
+    try {
+      const currentlyActive = Number(service.is_active) === 1;
+
+      const result = await apiRequest(
+        `/api/admin/service-types/${service.id}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            is_active: currentlyActive ? 0 : 1,
+          }),
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(
+          result.message || 'Unable to update service status.'
+        );
+      }
+
+      setMessage(result.message || 'Service status updated successfully.');
+
+      await fetchServices();
+    } catch (err) {
+      setError(err.message || 'Unable to update service status.');
+    }
+  }
+
+
+  const isActive = (service) =>
+    Number(service.is_active) === 1;
+  return (
+    <>
+      <PageHeading
+        eyebrow="CONFIGURATION"
+        title="Service types"
+        description="Manage service categories and commission percentages."
+        actions={
+          <div className="heading-actions">
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={fetchServices}
+              disabled={loading}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={() => {
+                resetForm();
+                setMessage('');
+                setError('');
+                document
+                  .querySelector('.service-form')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              + Add service type
+            </button>
+          </div>
+        }
+      />
+
+      <div className="callout">
+        <ShieldCheck size={19} />
+        <div>
+          <strong>Financial rule</strong>
+          <p>
+            Commission percentages are configured here. Existing earned
+            commissions should retain their recorded percentage and amount.
+          </p>
+        </div>
+      </div>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>{editingId ? 'Edit service type' : 'Add service type'}</h2>
+            <p>Manage service details and commission rules.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="service-form">
+          <label>
+            Service name
+            <input
+              value={form.name}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
+              placeholder="Enter service name"
+              required
+            />
+          </label>
+
+          <label>
+            Description
+            <textarea
+              value={form.description}
+              onChange={(event) =>
+                setForm({ ...form, description: event.target.value })
+              }
+              placeholder="Describe this service"
+              rows={3}
+            />
+          </label>
+
+          <label>
+            Commission percentage (%)
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={form.commission_percentage}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  commission_percentage: event.target.value,
+                })
+              }
+              required
+            />
+          </label>
+
+          <div className="heading-actions">
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={saving}
+            >
+              {saving
+                ? 'Saving...'
+                : editingId
+                  ? 'Save changes'
+                  : 'Create service type'}
+            </button>
+
+            {editingId && (
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={resetForm}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+
+        {message && <p role="status">{message}</p>}
+        {error && <p role="alert">{error}</p>}
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>Configured services</h2>
+            <p>{services.length} service types returned by the API</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Loading service types...</p>
+        ) : error && services.length === 0 ? (
+          <p role="alert">{error}</p>
+        ) : services.length === 0 ? (
+          <EmptyState
+            icon={HeartHandshake}
+            title="No service types found"
+            description="Create a service type using the form above."
+          />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Service type</th>
+                  <th>Description</th>
+                  <th>Commission</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {services.map((service) => (
+                  <tr key={service.id}>
+                    <td>{service.name}</td>
+                    <td>{service.description || '—'}</td>
+                    <td>{service.commission_percentage ?? 0}%</td>
+                    <td>
+                      {isActive(service) ? 'Active' : 'Inactive'}
+                    </td>
+                    <td>
+                      <div className="heading-actions">
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          onClick={() => startEdit(service)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-secondary"
+                          onClick={() => toggleStatus(service)}
+                        >
+                          {isActive(service)
+                            ? 'Deactivate'
+                            : 'Activate'}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-danger"
+                          onClick={() => openDeleteModal(service)}
+                          title={`Delete ${service.name}`}
+                        >
+                          <Trash2 size={15} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {deleteService && (
+        <div
+          className="delete-modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeDeleteModal();
+            }
+          }}
+        >
+          <section
+            className="delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+          >
+            <div className="delete-modal-icon">
+              <AlertTriangle size={25} />
+            </div>
+
+            <button
+              type="button"
+              className="delete-modal-close"
+              onClick={closeDeleteModal}
+              disabled={deleting}
+              aria-label="Close confirmation"
+            >
+              <X size={19} />
+            </button>
+
+            <span className="delete-modal-eyebrow">
+              DESTRUCTIVE ACTION
+            </span>
+
+            <h2 id="delete-modal-title">Delete service type?</h2>
+
+            <p className="delete-modal-description">
+              You are about to delete
+              {' '}
+              <strong>{deleteService.name}</strong>.
+              This action cannot be undone.
+            </p>
+
+            <div className="delete-warning">
+              <AlertTriangle size={17} />
+              <p>
+                If this service is linked to existing leads, deletion may be
+                blocked. Deactivate it instead if you need to retain its history.
+              </p>
+            </div>
+
+            <label className="delete-password-label" htmlFor="delete-admin-password">
+              Admin password
+            </label>
+
+            <div className="delete-password-field">
+              <input
+                id="delete-admin-password"
+                type={showDeletePassword ? 'text' : 'password'}
+                value={deletePassword}
+                onChange={(event) => {
+                  setDeletePassword(event.target.value);
+                  setDeleteError('');
+                }}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={deleting}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') confirmDelete();
+                  if (event.key === 'Escape') closeDeleteModal();
+                }}
+                autoFocus
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowDeletePassword((value) => !value)}
+                aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
+                disabled={deleting}
+              >
+                {showDeletePassword
+                  ? <EyeOff size={18} />
+                  : <Eye size={18} />}
+              </button>
+            </div>
+
+            {deleteError && (
+              <p className="delete-modal-error" role="alert">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closeDeleteModal}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={confirmDelete}
+                disabled={deleting || !deletePassword.trim()}
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw size={15} className="delete-spinner" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    Delete service
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
 }
 
+
+
 function CommissionsPage() {
+  const [commissions, setCommissions] = useState([]);
   const [status, setStatus] = useState('all');
-  return <>
-    <PageHeading eyebrow="FINANCE" title="Commissions & payouts" description="Review eligible commissions, approve amounts, and record payments manually." actions={<span className="soft-tag"><Wallet size={14} /> Manual owner approval</span>} />
-    <div className="callout"><ShieldCheck size={19} /><div><strong>No recruitment-based commission</strong><p>Only the eligible member who submitted the lead can earn the configured fixed commission. Team relationships do not create a commission entitlement.</p></div></div>
-    <section className="panel">
-      <div className="toolbar">
-        <label className="select-field"><Filter size={15} /><select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter commission status"><option value="all">All commission statuses</option><option value="pending">Pending approval</option><option value="approved">Approved</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select><ChevronDown size={14} /></label>
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState(null);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  async function fetchCommissions() {
+    try {
+      setLoading(true);
+      setError('');
+
+      const result = await apiRequest('/api/admin/commissions');
+
+      if (result.success === false) {
+        throw new Error(
+          result.message || 'Unable to load commissions.'
+        );
+      }
+
+      setCommissions(
+        Array.isArray(result.data) ? result.data : []
+      );
+    } catch (err) {
+      setError(err.message || 'Unable to load commissions.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchCommissions();
+  }, []);
+
+  async function performAction(commission, action) {
+    const id = commission.commission_id ?? commission.id;
+
+    if (!id) {
+      setError('Commission ID is missing.');
+      return;
+    }
+
+    let rejection_reason;
+
+    if (action === 'reject') {
+      rejection_reason = window.prompt(
+        'Enter the reason for rejecting this commission:'
+      );
+
+      if (rejection_reason === null) return;
+
+      if (!rejection_reason.trim()) {
+        setError('A rejection reason is required.');
+        return;
+      }
+    }
+
+    const labels = {
+      approve: 'approve',
+      reject: 'reject',
+      pay: 'mark as paid',
+    };
+
+    if (
+      !window.confirm(
+        `Are you sure you want to ${labels[action]} commission #${id}?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setActionId(id);
+      setError('');
+      setMessage('');
+
+      const body =
+        action === 'reject'
+          ? { rejection_reason: rejection_reason.trim() }
+          : undefined;
+
+      const result = await apiRequest(
+        `/api/admin/commissions/${id}/${action}`,
+        {
+          method: 'PATCH',
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        }
+      );
+
+      if (result.success === false) {
+        throw new Error(
+          result.message || `Unable to ${labels[action]} commission.`
+        );
+      }
+
+      setMessage(
+        result.message ||
+        `Commission ${labels[action]} successfully.`
+      );
+
+      await fetchCommissions();
+    } catch (err) {
+      setError(err.message || 'Unable to update commission.');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  const money = (value) =>
+    new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const label = (value = '') =>
+    String(value)
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const filteredCommissions = commissions.filter((commission) => {
+    const currentStatus =
+      commission.commission_status ?? commission.status ?? '';
+
+    const matchesStatus =
+      status === 'all' || currentStatus === status;
+
+    const search = query.trim().toLowerCase();
+
+    const searchable = [
+      commission.commission_id,
+      commission.id,
+      commission.lead_code,
+      commission.customer_name,
+      commission.service_name,
+      commission.eligible_member_name,
+    ];
+
+    const matchesSearch = searchable.some((value) =>
+      String(value ?? '').toLowerCase().includes(search)
+    );
+
+    return matchesStatus && matchesSearch;
+  });
+
+  const counts = {
+    all: commissions.length,
+    pending: commissions.filter(
+      (c) => (c.commission_status ?? c.status) === 'pending'
+    ).length,
+    approved: commissions.filter(
+      (c) => (c.commission_status ?? c.status) === 'approved'
+    ).length,
+    paid: commissions.filter(
+      (c) => (c.commission_status ?? c.status) === 'paid'
+    ).length,
+    rejected: commissions.filter(
+      (c) => (c.commission_status ?? c.status) === 'rejected'
+    ).length,
+  };
+
+  return (
+    <>
+      <PageHeading
+        eyebrow="FINANCE"
+        title="Commissions & payouts"
+        description="Review earned commissions, approve eligible amounts, and record payments."
+        actions={
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={fetchCommissions}
+            disabled={loading}
+          >
+            <RefreshCw size={15} />
+            Refresh
+          </button>
+        }
+      />
+
+      <div className="callout">
+        <ShieldCheck size={19} />
+        <div>
+          <strong>Commission calculation is locked to the earning record</strong>
+          <p>
+            Each commission retains the percentage and amount recorded
+            when it was generated. Updating a Service Type percentage
+            must not recalculate existing commissions. Only the eligible
+            lead submitter earns commission.
+          </p>
+        </div>
       </div>
-      <div className="table-wrap"><table><thead><tr><th>Commission ID</th><th>Lead / service</th><th>Eligible member</th><th>Amount</th><th>Status</th><th>Payment reference</th></tr></thead></table></div>
-      <EmptyState icon={Wallet} title="No commission records yet" description={status === 'all' ? 'Eligible commission records will be generated after a service is verified as completed.' : 'No records match this status. Live commission records will be available after API integration.'} />
-      <div className="table-footer"><span>Showing 0 commission records</span><span>Approval and payout actions will be enabled after authorization and API integration.</span></div>
-    </section>
-  </>;
+
+      {message && (
+        <div className="callout" role="status">
+          <CheckCircle2 size={19} />
+          <div><strong>{message}</strong></div>
+        </div>
+      )}
+
+      {error && (
+        <div className="callout" role="alert">
+          <X size={19} />
+          <div><strong>{error}</strong></div>
+        </div>
+      )}
+
+      <div className="stat-grid">
+        {[
+          ['Total records', counts.all],
+          ['Pending approval', counts.pending],
+          ['Approved', counts.approved],
+          ['Paid', counts.paid],
+        ].map(([title, value]) => (
+          <article className="stat-card" key={title}>
+            <div className="stat-top">
+              <span>{title}</span>
+              <span className="stat-icon">
+                <Wallet size={18} />
+              </span>
+            </div>
+            <strong className="stat-value">{value}</strong>
+            <span className="stat-note">Commission records</span>
+          </article>
+        ))}
+      </div>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h2>Commission register</h2>
+            <p>
+              {filteredCommissions.length} matching record(s)
+            </p>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search lead, customer, service, member..."
+              aria-label="Search commissions"
+            />
+          </label>
+
+          <label className="select-field">
+            <Filter size={15} />
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              aria-label="Filter commission status"
+            >
+              <option value="all">All statuses</option>
+              <option value="pending">Pending approval</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <ChevronDown size={14} />
+          </label>
+        </div>
+
+        {loading ? (
+          <p>Loading commissions...</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Commission</th>
+                  <th>Lead / customer</th>
+                  <th>Service</th>
+                  <th>Eligible member</th>
+                  <th>Service amount</th>
+                  <th>Rate</th>
+                  <th>Commission</th>
+                  <th>Status</th>
+                  <th>Approval / payment</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredCommissions.map((commission) => {
+                  const id =
+                    commission.commission_id ?? commission.id;
+
+                  const currentStatus =
+                    commission.commission_status ??
+                    commission.status ??
+                    'pending';
+
+                  return (
+                    <tr key={id}>
+                      <td>#{id}</td>
+
+                      <td>
+                        <strong>
+                          {commission.lead_code || '—'}
+                        </strong>
+                        <div>
+                          {commission.customer_name || '—'}
+                        </div>
+                      </td>
+
+                      <td>{commission.service_name || '—'}</td>
+
+                      <td>
+                        {commission.eligible_member_name || '—'}
+                        <div>
+                          {commission.eligible_member_role
+                            ? label(commission.eligible_member_role)
+                            : ''}
+                        </div>
+                      </td>
+
+                      <td>
+                        {commission.service_amount == null
+                          ? '—'
+                          : money(commission.service_amount)}
+                      </td>
+
+                      <td>
+                        {commission.commission_percentage ?? 0}%
+                      </td>
+
+                      <td>
+                        <strong>
+                          {money(commission.commission_amount)}
+                        </strong>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`lead-status status-${currentStatus}`}
+                        >
+                          <span className="status-indicator" />
+                          {label(currentStatus)}
+                        </span>
+                      </td>
+
+                      <td>
+                        {currentStatus === 'rejected' ? (
+                          <span title={commission.rejection_reason || ''}>
+                            {commission.rejection_reason || 'Rejected'}
+                          </span>
+                        ) : currentStatus === 'paid' ? (
+                          <>
+                            <div>
+                              Paid by {commission.paid_by_name || 'Admin'}
+                            </div>
+                            <div>
+                              {commission.paid_at
+                                ? new Date(
+                                  commission.paid_at
+                                ).toLocaleString()
+                                : 'Payment recorded'}
+                            </div>
+                          </>
+                        ) : currentStatus === 'approved' ? (
+                          <>
+                            <div>
+                              {commission.approved_by_name || 'Admin'}
+                            </div>
+                            <div>
+                              {commission.approved_at
+                                ? new Date(
+                                  commission.approved_at
+                                ).toLocaleDateString()
+                                : 'Approved'}
+                            </div>
+                          </>
+                        ) : (
+                          'Awaiting review'
+                        )}
+                      </td>
+
+                      <td>
+                        <div className="heading-actions">
+                          {currentStatus === 'pending' && (
+                            <>
+                              <button
+                                type="button"
+                                className="button button-primary"
+                                disabled={actionId !== null}
+                                onClick={() =>
+                                  performAction(commission, 'approve')
+                                }
+                              >
+                                {actionId === id
+                                  ? 'Working...'
+                                  : 'Approve'}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="button button-secondary"
+                                disabled={actionId !== null}
+                                onClick={() =>
+                                  performAction(commission, 'reject')
+                                }
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+
+                          {currentStatus === 'approved' && (
+                            <button
+                              type="button"
+                              className="button button-primary"
+                              disabled={actionId !== null}
+                              onClick={() =>
+                                performAction(commission, 'pay')
+                              }
+                            >
+                              {actionId === id
+                                ? 'Working...'
+                                : 'Mark paid'}
+                            </button>
+                          )}
+
+                          {currentStatus === 'paid' && (
+                            <span className="soft-tag">
+                              <CheckCircle2 size={14} />
+                              Completed
+                            </span>
+                          )}
+
+                          {currentStatus === 'rejected' && (
+                            <span className="soft-tag">
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!loading && filteredCommissions.length === 0 && (
+          <EmptyState
+            icon={Wallet}
+            title={
+              commissions.length === 0
+                ? 'No commission records found'
+                : 'No matching commissions'
+            }
+            description={
+              commissions.length === 0
+                ? 'Eligible commission records will appear after a service is completed and the backend generates the commission.'
+                : 'Try another search term or status filter.'
+            }
+            action="Reset filters"
+            onAction={() => {
+              setQuery('');
+              setStatus('all');
+            }}
+          />
+        )}
+
+        <div className="table-footer">
+          <span>
+            Showing <strong>{filteredCommissions.length}</strong> of{' '}
+            <strong>{commissions.length}</strong> commissions
+          </span>
+          <span>Live data from the protected admin API</span>
+        </div>
+      </section>
+    </>
+  );
 }
+
 
 
 function LoginPage({ onLogin }) {
