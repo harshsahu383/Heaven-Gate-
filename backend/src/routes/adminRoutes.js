@@ -816,6 +816,8 @@ const VALID_STATUSES = [
     'cancelled',
 ];
 
+
+
 router.patch(
     '/leads/:id/status',
     authenticate,
@@ -824,13 +826,13 @@ router.patch(
 
         try {
             const leadId = Number(req.params.id);
-            const { status, notes } = req.body;
+            const { status, notes, service_amount } = req.body;
             const user = req.user;
 
             if (!Number.isSafeInteger(leadId) || leadId <= 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid lead ID.',
+                    message: 'Invalid lead ID.'
                 });
             }
 
@@ -841,7 +843,7 @@ router.patch(
                 return res.status(400).json({
                     success: false,
                     message: 'Invalid lead status.',
-                    allowedStatuses: VALID_STATUSES,
+                    allowedStatuses: VALID_STATUSES
                 });
             }
 
@@ -852,23 +854,58 @@ router.patch(
             ) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Notes must be text.',
+                    message: 'Notes must be text.'
                 });
             }
 
             if (typeof notes === 'string' && notes.length > 5000) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Notes cannot exceed 5000 characters.',
+                    message: 'Notes cannot exceed 5000 characters.'
                 });
+            }
+
+            // Only admins can complete a lead and set its final charge.
+            if (status === 'completed' && user.role !== 'admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only an admin can complete a lead.'
+                });
+            }
+
+            // A final service charge is required to complete a lead.
+            if (status === 'completed') {
+                const amount = Number(service_amount);
+
+                if (
+                    service_amount === undefined ||
+                    service_amount === null ||
+                    service_amount === '' ||
+                    !Number.isFinite(amount) ||
+                    amount <= 0 ||
+                    Math.round(amount * 100) !== amount * 100 ||
+                    amount > 99999999.99
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            'A valid service_amount greater than zero is required to complete a lead.'
+                    });
+                }
             }
 
             connection = await pool.getConnection();
             await connection.beginTransaction();
 
-            // Lock the lead while validating and changing its status.
+            // Lock the lead during the status and commission operation.
             const [leads] = await connection.query(
-                `SELECT id, status, assigned_agent_id
+                `SELECT
+           id,
+           status,
+           assigned_agent_id,
+           submitted_by,
+           service_type_id,
+           service_amount
          FROM leads
          WHERE id = ?
          FOR UPDATE`,
@@ -880,19 +917,17 @@ router.patch(
 
                 return res.status(404).json({
                     success: false,
-                    message: 'Lead not found.',
+                    message: 'Lead not found.'
                 });
             }
 
             const lead = leads[0];
 
-            // Admins can update any lead.
-            // Calling agents can update only leads assigned to them.
             const isAdmin = user.role === 'admin';
 
             const isAssignedCallingAgent =
                 user.role === 'calling_agent' &&
-                Number(lead.assigned_agent_id) === user.id;
+                Number(lead.assigned_agent_id) === Number(user.id);
 
             if (!isAdmin && !isAssignedCallingAgent) {
                 await connection.rollback();
@@ -900,11 +935,20 @@ router.patch(
                 return res.status(403).json({
                     success: false,
                     message:
-                        'Only an admin or the assigned calling agent can update this lead.',
+                        'Only an admin or the assigned calling agent can update this lead.'
                 });
             }
 
-            // Do not create duplicate history entries.
+            // Completed leads cannot be reopened or have their status changed.
+            if (lead.status === 'completed' && status !== 'completed') {
+                await connection.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message: 'A completed lead cannot be reopened.'
+                });
+            }
+
             if (lead.status === status) {
                 await connection.rollback();
 
@@ -914,30 +958,108 @@ router.patch(
                     data: {
                         id: leadId,
                         status: lead.status,
-                        unchanged: true,
-                    },
+                        unchanged: true
+                    }
                 });
             }
 
             const oldStatus = lead.status;
 
-            await connection.query(
-                `UPDATE leads
-         SET status = ?
-         WHERE id = ?`,
-                [status, leadId]
-            );
+            let commissionCreated = false;
+            let commissionAmount = null;
+            let commissionPercentage = null;
 
+            if (status === 'completed') {
+                // Read the current rate for this service.
+                const [services] = await connection.query(
+                    `SELECT commission_percentage
+           FROM service_types
+           WHERE id = ?
+           LIMIT 1`,
+                    [lead.service_type_id]
+                );
+
+                if (services.length === 0) {
+                    await connection.rollback();
+
+                    return res.status(400).json({
+                        success: false,
+                        message: 'The lead service type was not found.'
+                    });
+                }
+
+                commissionPercentage = Number(
+                    services[0].commission_percentage
+                );
+
+                const serviceAmount = Number(service_amount);
+
+                commissionAmount = Number(
+                    (
+                        serviceAmount *
+                        commissionPercentage /
+                        100
+                    ).toFixed(2)
+                );
+
+                // The lead submitter is the only eligible member.
+                if (!lead.submitted_by) {
+                    await connection.rollback();
+
+                    return res.status(400).json({
+                        success: false,
+                        message: 'This lead has no eligible submitting member.'
+                    });
+                }
+
+                // Store the final charge and complete the lead.
+                await connection.query(
+                    `UPDATE leads
+           SET status = ?, service_amount = ?
+           WHERE id = ?`,
+                    [status, serviceAmount, leadId]
+                );
+
+                // The unique lead_id constraint prevents duplicate commissions.
+                await connection.query(
+                    `INSERT INTO commissions
+             (
+               lead_id,
+               eligible_member_id,
+               commission_amount,
+               commission_percentage,
+               status
+             )
+           VALUES (?, ?, ?, ?, 'pending')`,
+                    [
+                        leadId,
+                        lead.submitted_by,
+                        commissionAmount,
+                        commissionPercentage
+                    ]
+                );
+
+                commissionCreated = true;
+            } else {
+                await connection.query(
+                    `UPDATE leads
+           SET status = ?
+           WHERE id = ?`,
+                    [status, leadId]
+                );
+            }
+
+            // Keep the existing status history behavior.
             await connection.query(
                 `INSERT INTO lead_status_history
-          (lead_id, old_status, new_status, changed_by, notes)
+           (lead_id, old_status, new_status, changed_by, notes)
          VALUES (?, ?, ?, ?, ?)`,
                 [
                     leadId,
                     oldStatus,
                     status,
                     user.id,
-                    notes?.trim() || null,
+                    notes?.trim() || null
                 ]
             );
 
@@ -951,7 +1073,16 @@ router.patch(
                     oldStatus,
                     status,
                     changedBy: user.id,
-                },
+                    commissionCreated,
+                    ...(commissionCreated
+                        ? {
+                            serviceAmount: Number(service_amount),
+                            commissionPercentage,
+                            commissionAmount,
+                            commissionStatus: 'pending'
+                        }
+                        : {})
+                }
             });
         } catch (error) {
             if (connection) {
@@ -960,9 +1091,972 @@ router.patch(
 
             console.error('Lead status update failed:', error.message);
 
+            // A unique lead_id violation should never create a second commission.
+            if (error.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'A commission already exists for this lead. Please check the commission record.'
+                });
+            }
+
             return res.status(500).json({
                 success: false,
-                message: 'Unable to update lead status.',
+                message: 'Unable to update lead status.'
+            });
+        } finally {
+            connection?.release();
+        }
+    }
+);
+
+
+
+
+/**
+ * SERVICE TYPES APIs
+ */
+
+// GET /api/admin/service-types
+// List service types with optional search and active-status filtering.
+router.get(
+    '/service-types',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const { search, status } = req.query;
+
+            let sql = `
+               SELECT id, name, description, commission_percentage,
+       is_active, created_at, updated_at
+FROM service_types
+                WHERE 1 = 1
+            `;
+
+            const params = [];
+
+            if (search !== undefined) {
+                if (typeof search !== 'string') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Search must be text.',
+                    });
+                }
+
+                if (search.trim()) {
+                    sql += ' AND name LIKE ?';
+                    params.push(`%${search.trim()}%`);
+                }
+            }
+
+            if (status !== undefined && status !== 'all') {
+                if (!['active', 'inactive'].includes(status)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Status must be active, inactive, or all.',
+                    });
+                }
+
+                sql += ' AND is_active = ?';
+                params.push(status === 'active' ? 1 : 0);
+            }
+
+            sql += ' ORDER BY created_at DESC, id DESC';
+
+            const [services] = await pool.query(sql, params);
+
+            return res.json({
+                success: true,
+                count: services.length,
+                data: services,
+            });
+        } catch (error) {
+            console.error('Fetch service types failed:', error.message);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch service types.',
+            });
+        }
+    }
+);
+
+
+// GET /api/admin/service-types/:id
+// Fetch one service type.
+router.get(
+    '/service-types/:id',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const serviceId = Number(req.params.id);
+
+            if (!Number.isSafeInteger(serviceId) || serviceId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid service type ID.',
+                });
+            }
+
+            const [services] = await pool.query(
+                `SELECT id, name, description, commission_percentage,
+       is_active, created_at, updated_at
+FROM service_types
+                 WHERE id = ?
+                 LIMIT 1`,
+                [serviceId]
+            );
+
+            if (services.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Service type not found.',
+                });
+            }
+
+            return res.json({
+                success: true,
+                data: services[0],
+            });
+        } catch (error) {
+            console.error('Fetch service type failed:', error.message);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch service type.',
+            });
+        }
+    }
+);
+
+
+// POST /api/admin/service-types
+// Create a service type.
+
+router.post(
+    '/service-types',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const {
+                name,
+                description = null,
+                commission_percentage = 0,
+            } = req.body;
+
+            // Validate service name.
+            if (
+                typeof name !== 'string' ||
+                !name.trim() ||
+                name.trim().length > 150
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Name is required and must be at most 150 characters.',
+                });
+            }
+
+            // Validate description.
+            if (
+                description !== null &&
+                typeof description !== 'string'
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Description must be text or null.',
+                });
+            }
+
+            // Accept a percentage from 0 to 100, with up to 2 decimals.
+            const rate = Number(commission_percentage);
+
+            if (
+                commission_percentage === null ||
+                commission_percentage === '' ||
+                !Number.isFinite(rate) ||
+                rate < 0 ||
+                rate > 100 ||
+                Math.round(rate * 100) !== rate * 100
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Commission percentage must be between 0 and 100, with up to 2 decimal places.',
+                });
+            }
+
+            // Prevent duplicate service names.
+            const [existing] = await pool.query(
+                'SELECT id FROM service_types WHERE name = ? LIMIT 1',
+                [name.trim()]
+            );
+
+            if (existing.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'A service type with this name already exists.',
+                });
+            }
+
+            // Save the service and its commission percentage.
+            const [result] = await pool.query(
+                `INSERT INTO service_types
+                    (name, description, commission_percentage)
+                 VALUES (?, ?, ?)`,
+                [
+                    name.trim(),
+                    description?.trim() || null,
+                    rate,
+                ]
+            );
+
+            // Return the newly created service.
+            const [services] = await pool.query(
+                `SELECT
+                    id,
+                    name,
+                    description,
+                    commission_percentage,
+                    is_active,
+                    created_at,
+                    updated_at
+                 FROM service_types
+                 WHERE id = ?`,
+                [result.insertId]
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: 'Service type created successfully.',
+                data: services[0],
+            });
+        } catch (error) {
+            console.error('Create service type failed:', error.message);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to create service type.',
+            });
+        }
+    }
+);
+
+
+
+// PUT /api/admin/service-types/:id
+// Update a service type. Omitted fields remain unchanged.
+
+router.put('/service-types/:id', authenticate, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            name,
+            description = null,
+            commission_percentage = 0
+        } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({
+                message: 'Service type name is required'
+            });
+        }
+
+        const percentage = Number(commission_percentage);
+
+        if (
+            !Number.isFinite(percentage) ||
+            percentage < 0 ||
+            percentage > 100 ||
+            !/^\d+(\.\d{1,2})?$/.test(String(commission_percentage))
+        ) {
+            return res.status(400).json({
+                message: 'Commission percentage must be between 0 and 100, with up to 2 decimal places'
+            });
+        }
+
+        const [existing] = await pool.query(
+            'SELECT id FROM service_types WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            return res.status(404).json({
+                message: 'Service type not found'
+            });
+        }
+
+        const [duplicate] = await pool.query(
+            'SELECT id FROM service_types WHERE name = ? AND id != ?',
+            [name.trim(), id]
+        );
+
+        if (duplicate.length > 0) {
+            return res.status(409).json({
+                message: 'A service type with this name already exists'
+            });
+        }
+
+        await pool.query(
+            `UPDATE service_types
+       SET name = ?,
+           description = ?,
+           commission_percentage = ?
+       WHERE id = ?`,
+            [name.trim(), description, percentage, id]
+        );
+
+        const [updated] = await pool.query(
+            `SELECT id, name, description, commission_percentage,
+              is_active, created_at, updated_at
+       FROM service_types
+       WHERE id = ?`,
+            [id]
+        );
+
+        return res.json({
+            message: 'Service type updated successfully',
+            serviceType: updated[0]
+        });
+    } catch (error) {
+        console.error('Update service type error:', error);
+        return res.status(500).json({
+            message: 'Internal server error'
+        });
+    }
+});
+
+
+
+// PATCH /api/admin/service-types/:id/status
+// Activate or deactivate a service type.
+router.patch(
+    '/service-types/:id/status',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const serviceId = Number(req.params.id);
+            const { is_active } = req.body;
+
+            if (!Number.isSafeInteger(serviceId) || serviceId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid service type ID.',
+                });
+            }
+
+            if (![0, 1, true, false].includes(is_active)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'is_active must be true, false, 1, or 0.',
+                });
+            }
+
+            const [result] = await pool.query(
+                `UPDATE service_types
+                 SET is_active = ?
+                 WHERE id = ?`,
+                [Number(Boolean(is_active)), serviceId]
+            );
+
+            if (result.affectedRows === 0) {
+                const [existing] = await pool.query(
+                    'SELECT id FROM service_types WHERE id = ?',
+                    [serviceId]
+                );
+
+                if (existing.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Service type not found.',
+                    });
+                }
+            }
+
+            const [services] = await pool.query(
+                `SELECT
+                    id,
+                    name,
+                    description,
+                    commission_percentage,
+                    is_active,
+                    created_at,
+                    updated_at
+                 FROM service_types
+                 WHERE id = ?`,
+                [serviceId]
+            );
+
+            return res.json({
+                success: true,
+                message: `Service type ${Number(services[0].is_active) === 1 ? 'activated' : 'deactivated'} successfully.`,
+                data: services[0],
+            });
+        } catch (error) {
+            console.error('Change service type status failed:', error.message);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to change service type status.',
+            });
+        }
+    }
+);
+
+
+/**
+ * GET /api/admin/commissions
+ * List commissions with optional filters.
+ */
+router.get(
+    '/commissions',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const { status, member_id, search } = req.query;
+
+            const validStatuses = [
+                'pending',
+                'approved',
+                'paid',
+                'rejected'
+            ];
+
+            let sql = `
+        SELECT
+          c.id,
+          c.lead_id,
+          c.eligible_member_id,
+          c.commission_amount,
+          c.commission_percentage,
+          c.status,
+        c.approved_by,
+c.approved_at,
+c.paid_by,
+c.paid_at,
+          c.rejection_reason,
+          c.created_at,
+          c.updated_at,
+
+          l.lead_code,
+          l.customer_name,
+          l.customer_phone,
+          l.service_amount,
+          l.status AS lead_status,
+
+          s.name AS service_name,
+
+          m.full_name AS eligible_member_name,
+          m.email AS eligible_member_email,
+          m.role AS eligible_member_role,
+
+          approver.full_name AS approved_by_name,
+
+          paid_by.full_name AS paid_by_name
+
+        FROM commissions AS c
+
+        INNER JOIN leads AS l
+          ON l.id = c.lead_id
+
+        LEFT JOIN service_types AS s
+          ON s.id = l.service_type_id
+
+        INNER JOIN members AS m
+          ON m.id = c.eligible_member_id
+
+        LEFT JOIN members AS approver
+          ON approver.id = c.approved_by
+
+          LEFT JOIN members AS paid_by
+  ON paid_by.id = c.paid_by
+
+        WHERE 1 = 1
+      `;
+
+            const params = [];
+
+            // Filter by commission status.
+            if (status !== undefined && status !== 'all') {
+                if (!validStatuses.includes(status)) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            'Status must be pending, approved, paid, rejected, or all.'
+                    });
+                }
+
+                sql += ' AND c.status = ?';
+                params.push(status);
+            }
+
+            // Filter by the member who earned the commission.
+            if (member_id !== undefined) {
+                const memberId = Number(member_id);
+
+                if (
+                    !Number.isSafeInteger(memberId) ||
+                    memberId <= 0
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid member ID.'
+                    });
+                }
+
+                sql += ' AND c.eligible_member_id = ?';
+                params.push(memberId);
+            }
+
+            // Search by lead code, customer, or member name.
+            if (search !== undefined) {
+                if (typeof search !== 'string') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Search must be text.'
+                    });
+                }
+
+                if (search.trim()) {
+                    const term = `%${search.trim()}%`;
+
+                    sql += `
+            AND (
+              l.lead_code LIKE ?
+              OR l.customer_name LIKE ?
+              OR m.full_name LIKE ?
+            )
+          `;
+
+                    params.push(term, term, term);
+                }
+            }
+
+            sql += ' ORDER BY c.created_at DESC, c.id DESC LIMIT 100';
+
+            const [commissions] = await pool.query(sql, params);
+
+            return res.status(200).json({
+                success: true,
+                count: commissions.length,
+                data: commissions
+            });
+        } catch (error) {
+            console.error('Fetch commissions failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch commissions.'
+            });
+        }
+    }
+);
+
+
+
+/**
+ * GET /api/admin/commissions/:id
+ * Fetch details of one commission.
+ */
+router.get(
+    '/commissions/:id',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const commissionId = Number(req.params.id);
+
+            if (
+                !Number.isSafeInteger(commissionId) ||
+                commissionId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid commission ID.'
+                });
+            }
+
+            const [rows] = await pool.query(
+                `SELECT
+           c.id AS commission_id,
+           c.lead_id,
+           c.eligible_member_id,
+           c.commission_amount,
+           c.commission_percentage,
+           c.status AS commission_status,
+          c.approved_by,
+c.approved_at,
+c.paid_by,
+c.paid_at,
+           c.rejection_reason,
+           c.created_at AS commission_created_at,
+           c.updated_at AS commission_updated_at,
+
+           l.lead_code,
+           l.customer_name,
+           l.customer_phone,
+           l.customer_email,
+           l.hospital_or_location,
+           l.pickup_location,
+           l.destination,
+           l.scheduled_at,
+           l.service_amount,
+           l.status AS lead_status,
+
+           s.id AS service_type_id,
+           s.name AS service_name,
+
+           m.full_name AS eligible_member_name,
+           m.email AS eligible_member_email,
+           m.phone AS eligible_member_phone,
+           m.role AS eligible_member_role,
+
+           approver.full_name AS approved_by_name,
+
+
+           paid_by.full_name AS paid_by_name
+
+         FROM commissions AS c
+
+         INNER JOIN leads AS l
+           ON l.id = c.lead_id
+
+         LEFT JOIN service_types AS s
+           ON s.id = l.service_type_id
+
+         INNER JOIN members AS m
+           ON m.id = c.eligible_member_id
+
+         LEFT JOIN members AS approver
+           ON approver.id = c.approved_by
+
+           LEFT JOIN members AS paid_by
+  ON paid_by.id = c.paid_by
+
+         WHERE c.id = ?
+         LIMIT 1`,
+                [commissionId]
+            );
+
+            if (rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Commission not found.'
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: rows[0]
+            });
+        } catch (error) {
+            console.error('Fetch commission details failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch commission details.'
+            });
+        }
+    }
+);
+
+
+/**
+ * PATCH /api/admin/commissions/:id/approve
+ * Approve a pending commission.
+ */
+router.patch(
+    '/commissions/:id/approve',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        let connection;
+
+        try {
+            const commissionId = Number(req.params.id);
+
+            if (
+                !Number.isSafeInteger(commissionId) ||
+                commissionId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid commission ID.'
+                });
+            }
+
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+
+            const [commissions] = await connection.query(
+                `SELECT id, status
+         FROM commissions
+         WHERE id = ?
+         FOR UPDATE`,
+                [commissionId]
+            );
+
+            if (commissions.length === 0) {
+                await connection.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message: 'Commission not found.'
+                });
+            }
+
+            if (commissions[0].status !== 'pending') {
+                await connection.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message: `Only pending commissions can be approved. Current status: ${commissions[0].status}.`
+                });
+            }
+
+            await connection.query(
+                `UPDATE commissions
+         SET status = 'approved',
+             approved_by = ?,
+             approved_at = NOW(),
+             rejection_reason = NULL
+         WHERE id = ?`,
+                [req.user.id, commissionId]
+            );
+
+            await connection.commit();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Commission approved successfully.',
+                data: {
+                    id: commissionId,
+                    status: 'approved',
+                    approved_by: req.user.id
+                }
+            });
+        } catch (error) {
+            if (connection) {
+                await connection.rollback();
+            }
+
+            console.error('Approve commission failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to approve commission.'
+            });
+        } finally {
+            connection?.release();
+        }
+    }
+);
+
+/**
+ * PATCH /api/admin/commissions/:id/reject
+ * Reject a pending commission. Admin only.
+ */
+router.patch(
+    '/commissions/:id/reject',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        let connection;
+
+        try {
+            const commissionId = Number(req.params.id);
+            const { rejection_reason } = req.body;
+
+            if (
+                !Number.isSafeInteger(commissionId) ||
+                commissionId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid commission ID.'
+                });
+            }
+
+            if (
+                typeof rejection_reason !== 'string' ||
+                !rejection_reason.trim()
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'A rejection reason is required.'
+                });
+            }
+
+            if (rejection_reason.trim().length > 5000) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Rejection reason cannot exceed 5000 characters.'
+                });
+            }
+
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+
+            const [commissions] = await connection.query(
+                `SELECT id, status
+         FROM commissions
+         WHERE id = ?
+         FOR UPDATE`,
+                [commissionId]
+            );
+
+            if (commissions.length === 0) {
+                await connection.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message: 'Commission not found.'
+                });
+            }
+
+            if (commissions[0].status !== 'pending') {
+                await connection.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        `Only pending commissions can be rejected. Current status: ${commissions[0].status}.`
+                });
+            }
+
+            await connection.query(
+                `UPDATE commissions
+         SET status = 'rejected',
+             rejection_reason = ?
+         WHERE id = ?`,
+                [rejection_reason.trim(), commissionId]
+            );
+
+            await connection.commit();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Commission rejected successfully.',
+                data: {
+                    id: commissionId,
+                    status: 'rejected',
+                    rejection_reason: rejection_reason.trim()
+                }
+            });
+        } catch (error) {
+            if (connection) {
+                await connection.rollback();
+            }
+
+            console.error('Reject commission failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to reject commission.'
+            });
+        } finally {
+            connection?.release();
+        }
+    }
+);
+
+
+/**
+ * PATCH /api/admin/commissions/:id/pay
+ * Mark an approved commission as paid. Admin only.
+ */
+router.patch(
+    '/commissions/:id/pay',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        let connection;
+
+        try {
+            const commissionId = Number(req.params.id);
+
+            if (
+                !Number.isSafeInteger(commissionId) ||
+                commissionId <= 0
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid commission ID.'
+                });
+            }
+
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+
+            const [commissions] = await connection.query(
+                `SELECT id, status
+         FROM commissions
+         WHERE id = ?
+         FOR UPDATE`,
+                [commissionId]
+            );
+
+            if (commissions.length === 0) {
+                await connection.rollback();
+
+                return res.status(404).json({
+                    success: false,
+                    message: 'Commission not found.'
+                });
+            }
+
+            if (commissions[0].status !== 'approved') {
+                await connection.rollback();
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'Only approved commissions can be marked as paid.'
+                });
+            }
+
+            await connection.query(
+                `UPDATE commissions
+         SET status = 'paid',
+             paid_by = ?,
+             paid_at = NOW()
+         WHERE id = ?`,
+                [req.user.id, commissionId]
+            );
+
+            await connection.commit();
+
+            const [adminRows] = await connection.query(
+                `SELECT full_name
+   FROM members
+   WHERE id = ?`,
+                [req.user.id]
+            );
+
+
+            return res.status(200).json({
+                success: true,
+                message: 'Commission marked as paid successfully.',
+                data: {
+                    id: commissionId,
+                    status: 'paid',
+                    paid_by: req.user.id,
+                    paid_by_name: adminRows[0]?.full_name || 'Admin'
+                }
+            });
+        } catch (error) {
+            if (connection) {
+                await connection.rollback();
+            }
+
+            console.error('Mark commission as paid failed:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to mark commission as paid.'
             });
         } finally {
             connection?.release();
