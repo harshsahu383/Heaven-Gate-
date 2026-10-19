@@ -2163,6 +2163,7 @@ function LeadDetailsPage({ leadId, onBack }) {
   const [error, setError] = React.useState('');
   const [status, setStatus] = React.useState('');
   const [notes, setNotes] = React.useState('');
+  const [serviceAmount, setServiceAmount] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState('');
 
@@ -2180,6 +2181,9 @@ function LeadDetailsPage({ leadId, onBack }) {
 
       setLead(leadData);
       setStatus(leadData.status || 'new');
+      setServiceAmount(
+        leadData.service_amount == null ? '' : String(leadData.service_amount)
+      );
     } catch (err) {
       setError(err.message || 'Failed to load lead details.');
     } finally {
@@ -2200,7 +2204,11 @@ function LeadDetailsPage({ leadId, onBack }) {
     try {
       await apiRequest(`/api/admin/leads/${leadId}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status, notes }),
+        body: JSON.stringify({
+          status,
+          notes,
+          ...(status === 'completed' ? { service_amount: serviceAmount } : {}),
+        }),
       });
 
       setMessage('Lead status updated successfully.');
@@ -2294,6 +2302,17 @@ function LeadDetailsPage({ leadId, onBack }) {
             <strong>{lead.service_name || '—'}</strong>
           </div>
           <div className="lead-info-row">
+            <span>Service amount</span>
+            <strong>
+              {lead.service_amount == null
+                ? 'Not set'
+                : `₹${Number(lead.service_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`}
+            </strong>
+          </div>
+          <div className="lead-info-row">
             <span>Hospital / location</span>
             <strong>{lead.hospital_or_location || '—'}</strong>
           </div>
@@ -2341,6 +2360,21 @@ function LeadDetailsPage({ leadId, onBack }) {
               <option value="cancelled">Cancelled</option>
             </select>
           </label>
+
+          {status === 'completed' && (
+            <label>
+              Final service amount (INR)
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={serviceAmount}
+                onChange={event => setServiceAmount(event.target.value)}
+                placeholder="Enter the service amount"
+                required
+              />
+            </label>
+          )}
 
           <label>
             Update notes

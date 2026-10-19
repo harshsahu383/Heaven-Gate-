@@ -2,6 +2,7 @@
 import express from 'express';
 import pool from '../config/db.js';
 import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 import {
     authenticate,
     requireAdmin,
@@ -359,6 +360,7 @@ router.get(
                     l.destination,
                     l.scheduled_at,
                     l.status,
+                    l.service_amount,
                     l.created_at,
                     l.updated_at,
                     s.name AS service_name
@@ -614,6 +616,7 @@ router.post('/leads', authenticate, async (req, res) => {
             destination,
             scheduled_at,
             notes,
+            service_amount,
         } = req.body;
 
         // Validate required fields.
@@ -631,6 +634,23 @@ router.post('/leads', authenticate, async (req, res) => {
                     'Customer name, phone, and a valid service type are required.',
             });
         }
+
+        if (
+            service_amount !== undefined &&
+            service_amount !== null &&
+            !isValidServiceAmount(service_amount)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    'service_amount must be a valid amount greater than zero.',
+            });
+        }
+
+        const serviceAmount =
+            service_amount === undefined || service_amount === null
+                ? null
+                : Number(service_amount);
 
         // Confirm the service exists and is active.
         const [services] = await pool.query(
@@ -663,8 +683,9 @@ router.post('/leads', authenticate, async (req, res) => {
                 destination,
                 scheduled_at,
                 notes,
+                service_amount,
                 status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
             [
                 `LD-${Date.now()}`,
                 customer_name.trim(),
@@ -677,6 +698,7 @@ router.post('/leads', authenticate, async (req, res) => {
                 destination || null,
                 scheduled_at || null,
                 notes || null,
+                serviceAmount,
             ]
         );
 
@@ -686,6 +708,7 @@ router.post('/leads', authenticate, async (req, res) => {
             data: {
                 id: result.insertId,
                 status: 'new',
+                service_amount: serviceAmount,
             },
         });
     } catch (error) {
@@ -729,6 +752,7 @@ router.get('/leads/:id', authenticate, async (req, res) => {
         l.scheduled_at,
         l.notes,
         l.status,
+        l.service_amount,
         l.submitted_by,
         l.assigned_agent_id,
         l.created_at,
@@ -817,6 +841,20 @@ const VALID_STATUSES = [
     'cancelled',
 ];
 
+function isValidServiceAmount(value) {
+    const amount = Number(value);
+
+    return (
+        value !== undefined &&
+        value !== null &&
+        value !== '' &&
+        Number.isFinite(amount) &&
+        amount > 0 &&
+        Math.abs(amount * 100 - Math.round(amount * 100)) < 1e-7 &&
+        amount <= 99999999.99
+    );
+}
+
 
 
 router.patch(
@@ -872,27 +910,6 @@ router.patch(
                     success: false,
                     message: 'Only an admin can complete a lead.'
                 });
-            }
-
-            // A final service charge is required to complete a lead.
-            if (status === 'completed') {
-                const amount = Number(service_amount);
-
-                if (
-                    service_amount === undefined ||
-                    service_amount === null ||
-                    service_amount === '' ||
-                    !Number.isFinite(amount) ||
-                    amount <= 0 ||
-                    Math.round(amount * 100) !== amount * 100 ||
-                    amount > 99999999.99
-                ) {
-                    return res.status(400).json({
-                        success: false,
-                        message:
-                            'A valid service_amount greater than zero is required to complete a lead.'
-                    });
-                }
             }
 
             connection = await pool.getConnection();
@@ -964,11 +981,30 @@ router.patch(
                 });
             }
 
+            const finalServiceAmount =
+                service_amount === undefined || service_amount === null
+                    ? lead.service_amount
+                    : service_amount;
+
+            if (
+                status === 'completed' &&
+                !isValidServiceAmount(finalServiceAmount)
+            ) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        'A valid service_amount greater than zero is required to complete a lead.'
+                });
+            }
+
             const oldStatus = lead.status;
 
             let commissionCreated = false;
             let commissionAmount = null;
             let commissionPercentage = null;
+            let serviceAmount = null;
 
             if (status === 'completed') {
                 // Read the current rate for this service.
@@ -993,7 +1029,7 @@ router.patch(
                     services[0].commission_percentage
                 );
 
-                const serviceAmount = Number(service_amount);
+                serviceAmount = Number(finalServiceAmount);
 
                 commissionAmount = Number(
                     (
@@ -1077,7 +1113,7 @@ router.patch(
                     commissionCreated,
                     ...(commissionCreated
                         ? {
-                            serviceAmount: Number(service_amount),
+                            serviceAmount,
                             commissionPercentage,
                             commissionAmount,
                             commissionStatus: 'pending'
@@ -2198,6 +2234,78 @@ router.delete(
             });
         } finally {
             connection.release();
+        }
+    }
+);
+
+/**
+ * POST /api/admin/team-registration-codes
+ * Generate a secure registration code for a new Team Member.
+ */
+router.post(
+    '/team-registration-codes',
+    authenticate,
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const { expiresInHours = 72 } = req.body ?? {};
+
+            // Validate the expiry period: 1 hour to 30 days.
+            if (
+                !Number.isInteger(expiresInHours) ||
+                expiresInHours < 1 ||
+                expiresInHours > 720
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        'expiresInHours must be an integer between 1 and 720.'
+                });
+            }
+
+            // Generate a cryptographically secure random code.
+            const registrationCode =
+                `TM-${crypto.randomBytes(24).toString('hex')}`;
+
+            // Store only the SHA-256 hash, never the plain-text code.
+            const codeHash = crypto
+                .createHash('sha256')
+                .update(registrationCode)
+                .digest('hex');
+
+            const expiresAt = new Date(
+                Date.now() + expiresInHours * 60 * 60 * 1000
+            );
+
+            // req.user.id comes from the authenticated admin's JWT.
+            const [result] = await pool.execute(
+                `INSERT INTO team_registration_codes
+                    (code_hash, created_by, expires_at)
+                 VALUES (?, ?, ?)`,
+                [codeHash, req.user.id, expiresAt]
+            );
+
+            // The plain-text code is returned only at creation time.
+            return res.status(201).json({
+                success: true,
+                message: 'Team Member registration code created successfully.',
+                data: {
+                    id: result.insertId,
+                    code: registrationCode,
+                    expiresAt: expiresAt.toISOString(),
+                    expiresInHours
+                }
+            });
+        } catch (error) {
+            console.error(
+                'Create Team Member registration code failed:',
+                error.message
+            );
+
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to create registration code.'
+            });
         }
     }
 );
